@@ -5,10 +5,19 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Esquema temporal para desbloquear el desarrollo de Alicante Futura
+model Employee {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  position  String? // El '?' significa que puede ser nulo (opcional)
+  createdAt DateTime @default(now())
 }
