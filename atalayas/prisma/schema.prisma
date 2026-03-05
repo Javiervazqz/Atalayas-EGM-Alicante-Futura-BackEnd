@@ -594,6 +594,7 @@ enum one_time_token_type {
 enum Role {
   ADMIN
   EMPLOYEE
+  GENERAL_ADMIN
 
   @@schema("public")
 }

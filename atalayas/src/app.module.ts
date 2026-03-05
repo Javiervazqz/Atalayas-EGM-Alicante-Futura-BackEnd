@@ -9,5 +9,9 @@ import { SupabaseService } from './supabase/supabase.service';
   imports: [SupabaseModule, PrismaModule],
   controllers: [AppController],
   providers: [AppService, SupabaseService],
+import { PrismaModule } from './prisma/prisma.module';
+
+@Module({
+  imports: [PrismaModule],
 })
 export class AppModule {}

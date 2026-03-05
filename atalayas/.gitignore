@@ -10,9 +10,6 @@ yarn.lock
 # =========================================
 # Salida de NestJS
 dist/
-# Salida de React (Vite)
-build/
-dist-ssr/
 
 # =========================================
 # 🔐 VARIABLES DE ENTORNO Y SECRETOS
