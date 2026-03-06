@@ -54,3 +54,4 @@ coverage/
 *.ntvs*
 *.njsproj
 *.sln
+/generated/prisma
