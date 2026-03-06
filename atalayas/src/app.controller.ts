@@ -16,6 +16,7 @@ export class AppController {
 
   @Get('User')
   async getUsers() {
-    return await this.prismaService.user.findMany();
+    const users = await this.prismaService.user.findMany();
+    return users;
   }
 }
