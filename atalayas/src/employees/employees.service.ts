@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client/extension';
 @Injectable()
 export class EmployeesService {
   create(createEmployeeDto: CreateEmployeeDto) {
-    return 'This action adds a new employee';
+    return 'This action adds a new employe';
   }
 
   findAll() {
