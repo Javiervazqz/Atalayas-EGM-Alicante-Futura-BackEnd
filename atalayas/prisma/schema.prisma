@@ -1,7 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["partialIndexes"]
-  multiSchema     = "true"
 }
 
 datasource db {
@@ -469,13 +468,12 @@ model Company {
 
 model Course {
   title      String
-  createdAt  DateTime     @default(now())
-  videoUrl   String?
-  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId  String       @db.Uuid
-  content    String?
-  Company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Enrollment Enrollment[]
+  createdAt  DateTime    @default(now())
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String      @db.Uuid
+  Content    Content[]
+  Company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Enrollment Enrollment?
 
   @@schema("public")
 }
@@ -495,28 +493,42 @@ model Document {
 }
 
 model Enrollment {
-  progress Int    @default(0)
-  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId   String @db.Uuid
-  courseId String @db.Uuid
-  Course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  User     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progress         Int    @default(0)
+  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String @unique @db.Uuid
+  courseId         String @unique @db.Uuid
+  completedContent Int    @default(0) @db.SmallInt
+  Course           Course @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User             User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([userId, courseId])
   @@schema("public")
 }
 
 model User {
-  email      String       @unique
+  email      String      @unique
   name       String
-  role       Role         @default(EMPLOYEE)
-  createdAt  DateTime     @default(now())
-  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId  String       @db.Uuid
+  role       Role        @default(EMPLOYEE)
+  createdAt  DateTime    @default(now())
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String      @db.Uuid
   Document   Document[]
-  Enrollment Enrollment[]
-  Company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  users      users        @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Enrollment Enrollment?
+  Company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users      users       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("public")
+}
+
+model Content {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  title      String
+  pdfUrl     String?
+  videoUrl   String?
+  order      Int      @db.SmallInt
+  courseId   String   @db.Uuid
+  Course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@schema("public")
 }
