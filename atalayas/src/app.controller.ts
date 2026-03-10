@@ -18,12 +18,9 @@ export class AppController {
   }
   @ApiBearerAuth()
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('EMPLOYEE')
   @Get('User')
   async getUsers() {
     const users = await this.prismaService.user.findMany();
     return users;
   }
-
- /* @Post('auth/login')*/
 }

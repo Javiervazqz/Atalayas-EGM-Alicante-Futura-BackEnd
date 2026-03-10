@@ -16,7 +16,6 @@ export class AuthGuard implements CanActivate {
         if(!token) return false;
 
         const authUser = await this.authService.getUser(token);
-        console.log('Usuario del token', authUser);
 
         if(!authUser) return false;
 
