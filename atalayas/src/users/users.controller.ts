@@ -1,15 +1,25 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/roles.decorator';
+import {ApiBearerAuth} from '@nestjs/swagger';
+import { Request } from '@nestjs/common';
+import { Req } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
+@ApiBearerAuth()
+@UseGuards(AuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  @Roles('ADMIN', 'GENERAL_ADMIN')
+  async create(@Body() createUserDto: CreateUserDto, @Req() request: Request) {
+    return this.usersService.create(createUserDto, request['user']);
   }
 
   @Get()
