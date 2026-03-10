@@ -11,7 +11,16 @@ import { ContentModule } from './content/content.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
 
 @Module({
-  imports: [ConfigModule.forRoot(), PrismaModule, UserModule, CompanyModule, CourseModule, DocumentModule, ContentModule, EnrollmentModule],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    UserModule,
+    CompanyModule,
+    CourseModule,
+    DocumentModule,
+    ContentModule,
+    EnrollmentModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
