@@ -2,12 +2,13 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from '../prisma/prisma.service';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { User } from '@prisma/client';
+import { CreateUserDto } from './dto/create-user.dto.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class UserService {
@@ -22,51 +23,55 @@ export class UserService {
     );
   }
 
-  async create(createUserDto: CreateUserDto) {
-    const { email, password, name, companyId, role } = createUserDto;
-
-    const companyExists = await this.prisma.company.findUnique({
-      where: { id: companyId },
-    });
-
-    if (!companyExists) {
-      throw new NotFoundException(`La empresa con ID ${companyId} no existe`);
+  async create(createUserDto: CreateUserDto, requestUser: User) {
+    // 1. SEGURIDAD: Control de permisos
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException('No tienes permisos para crear usuarios');
     }
 
-    // PASO A: Crear el usuario en el sistema de seguridad de Supabase Auth
+    // 2. SEGURIDAD: Contraseña aleatoria provisional (8 caracteres)
+    const password = Math.random().toString(36).slice(-8);
+
+    // 3. Crear el usuario en el sistema de seguridad de Supabase Auth
     const { data: authData, error: authError } =
       await this.supabase.auth.admin.createUser({
-        email: email,
+        email: createUserDto.email,
         password: password,
-        email_confirm: true, // Lo ponemos a true para que no requiera confirmar por email ahora mismo
+        email_confirm: true,
       });
 
-    if (authError) {
-      // Si Supabase se queja (ej: contraseña muy corta, email repetido), lanzamos el error a Swagger
-      throw new BadRequestException(
-        `Error al crear usuario en Supabase: ${authError.message}`,
+    if (authError || !authData.user) {
+      throw new InternalServerErrorException(
+        `Error al crear usuario en Supabase: ${authError?.message || 'Error desconocido'}`,
       );
     }
 
-    // PASO B: Si ha ido bien, lo guardamos en tu tabla pública con el ID que nos ha dado Supabase
+    // 4. ROBUSTEZ: Intentamos guardar en tu base de datos pública con Prisma
     try {
       const newUser = await this.prisma.user.create({
         data: {
           id: authData.user.id,
-          email: email,
-          name: name,
-          companyId: companyId,
-          role: role,
+          email: createUserDto.email,
+          name: createUserDto.name,
+          companyId: requestUser.companyId, // Forzado al ID de la empresa del creador
+          role: createUserDto.role || 'EMPLOYEE',
         },
       });
-      return newUser;
+
+      // 5. Devolvemos los datos junto con la contraseña para que se la envíen al empleado
+      return {
+        ...newUser,
+        provisionalPassword: password,
+      };
     } catch {
-      // Si algo falla en Prisma (ej: el companyId no existe), borramos el usuario de Auth para no dejar rastro
-      if (authData?.user?.id) {
+      // (Quitamos la variable 'error' del catch para que ESLint no avise de variable sin usar)
+      // ROLLBACK: Si Prisma falla, limpiamos Supabase para no dejar "fantasmas"
+      if (authData.user.id) {
         await this.supabase.auth.admin.deleteUser(authData.user.id);
       }
+
       throw new InternalServerErrorException(
-        'Error al guardar el perfil del usuario. Se ha revertido la operación.',
+        'Error al guardar el perfil del usuario en la base de datos. Se ha revertido la operación en Auth.',
       );
     }
   }
@@ -88,7 +93,7 @@ export class UserService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
-    await this.findOne(id);
+    await this.findOne(id); // Verificamos que existe antes de actualizar
 
     return this.prisma.user.update({
       where: { id },
@@ -97,7 +102,7 @@ export class UserService {
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    await this.findOne(id); // Verificamos que existe antes de borrar
 
     return this.prisma.user.delete({
       where: { id },

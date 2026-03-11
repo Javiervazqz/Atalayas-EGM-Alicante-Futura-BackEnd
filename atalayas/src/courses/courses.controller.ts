@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -32,7 +42,11 @@ export class CoursesController {
 
   @Patch(':id')
   @Roles('ADMIN', 'GENERAL_ADMIN')
-  update(@Param('id') id: string, @Body() updateCourseDto: UpdateCourseDto, @Req() req: Request) {
+  update(
+    @Param('id') id: string,
+    @Body() updateCourseDto: UpdateCourseDto,
+    @Req() req: Request,
+  ) {
     return this.coursesService.update(id, updateCourseDto, req['user']);
   }
 

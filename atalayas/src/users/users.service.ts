@@ -1,4 +1,10 @@
-import { Injectable, UseGuards, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  UseGuards,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,11 +17,11 @@ import { AuthService } from 'src/auth/auth.service';
 export class UsersService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
   ) {}
 
   async create(createUserDto: CreateUserDto, requestUser: User) {
-    if(requestUser.role === 'EMPLOYEE') {
+    if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('No tienes permisos para crear usuarios');
     }
 
@@ -23,25 +29,24 @@ export class UsersService {
 
     const authUser = await this.authService.register(
       createUserDto.email,
-      password
+      password,
     );
 
     const newUser = await this.prismaService.user.create({
       data: {
-      id: authUser.id,
-      email: createUserDto.email,
-      name: createUserDto.name,
-      companyId : requestUser.companyId,
-      }
+        id: authUser.id,
+        email: createUserDto.email,
+        name: createUserDto.name,
+        companyId: requestUser.companyId,
+      },
     });
 
     return {
       ...newUser,
-      provisionalPassword: password
+      provisionalPassword: password,
     };
-
   }
-  
+
   findAll() {
     return `This action returns all users`;
   }
