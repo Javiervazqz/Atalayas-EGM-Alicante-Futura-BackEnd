@@ -1,12 +1,12 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { AppModule } from './app.module'; // (Añade .js si sigues en modo estricto ESM)
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule } from '@nestjs/swagger/dist/swagger-module';
-import { DocumentBuilder } from '@nestjs/swagger/dist/document-builder';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // 1. Configuración de validaciones globales
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -14,12 +14,26 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  
+
+  // 2. Configuración de CORS para el frontend
   app.enableCors({
     origin: 'http://localhost:5173',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
+
+  // 3. Configuración de Swagger
+  const config = new DocumentBuilder()
+    .setTitle('API de Atalayas')
+    .setDescription('Documentación de los endpoints del proyecto')
+    .setVersion('1.0')
+    .addBearerAuth() // Añadimos esto para poder meter el token JWT de Supabase en la UI
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+
+  // Montamos Swagger en la ruta '/swagger'
+  SwaggerModule.setup('swagger', app, document);
 
   await app.listen(process.env.PORT ?? 3000);
 }
