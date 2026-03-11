@@ -9,6 +9,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
+
 @Injectable()
 export class UsersService {
   constructor(
