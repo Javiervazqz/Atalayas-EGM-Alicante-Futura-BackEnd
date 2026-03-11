@@ -24,17 +24,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
-
-  const config = new DocumentBuilder()
-    .setTitle('API de Atalayas EGM')
-    .setDescription('Documentación de los endpoints del backend')
-    .setVersion('1.0')
-    .addTag('Users')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('swagger', app, document);
-
+  
   app.enableCors({
     origin: 'http://localhost:5173',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',

@@ -23,6 +23,7 @@ export class AuthService {
     if(error) { return null }
     return data.user;
   }
+  
   async login(email: string, password: string) {
     const { data, error } = await this.supabase.auth.signInWithPassword({
       email,
@@ -58,5 +59,10 @@ export class AuthService {
     if(error) throw new UnauthorizedException(error.message);
 
     return data.user;
+  }
+
+  async deleteUser(id: string) {
+    const { error } = await this.supabaseAdmin.auth.admin.deleteUser(id);
+    if (error) throw new UnauthorizedException(error.message);
   }
 }
