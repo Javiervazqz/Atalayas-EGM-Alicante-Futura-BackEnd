@@ -12,12 +12,11 @@ import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
-
 @Injectable()
 export class UsersService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly authService: AuthService,
+    private readonly authService: AuthService
   ) {}
 
   async create(createUserDto: CreateUserDto, requestUser: User) {
@@ -31,7 +30,7 @@ export class UsersService {
       createUserDto.email,
       password,
     );
-
+    try{
     const newUser = await this.prismaService.user.create({
       data: {
         id: authUser.id,
@@ -45,6 +44,7 @@ export class UsersService {
       ...newUser,
       provisionalPassword: password,
     };
+
   }
 
   findAll() {

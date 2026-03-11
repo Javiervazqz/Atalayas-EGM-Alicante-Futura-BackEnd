@@ -16,11 +16,5 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
-  @ApiBearerAuth()
-  @UseGuards(AuthGuard, RolesGuard)
-  @Get('User')
-  async getUsers() {
-    const users = await this.prismaService.user.findMany();
-    return users;
-  }
+
 }
