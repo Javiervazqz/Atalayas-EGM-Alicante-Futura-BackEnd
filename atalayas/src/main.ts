@@ -21,6 +21,16 @@ async function bootstrap() {
     credentials: true,
   });
 
+  const config = new DocumentBuilder()
+    .setTitle('Atalayas API')
+    .setDescription('API de Atalayas EGM')
+    .setVersion('1.0')
+    .addBearerAuth() // 👈 añade el campo para meter el token
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

@@ -10,7 +10,7 @@ import { User } from '@prisma/client';
 
 @Injectable()
 export class CoursesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prismaService: PrismaService) {}
 
   async create(createCourseDto: CreateCourseDto, requestUser: User) {
     // 1. Control de Roles: Los empleados no crean cursos
@@ -19,7 +19,7 @@ export class CoursesService {
     }
 
     // 2. Multitenancy: Forzamos el ID de la empresa del usuario creador
-    return await this.prisma.course.create({
+    return await this.prismaService.course.create({
       data: {
         ...createCourseDto, // Expandimos los demás datos del DTO (title, description, etc.)
         companyId: requestUser.companyId, // Sobrescribimos/Inyectamos el ID seguro
@@ -30,13 +30,13 @@ export class CoursesService {
   async findAll(requestUser: User) {
     // 1. Si es Super Administrador, lo ve todo
     if (requestUser.role === 'GENERAL_ADMIN') {
-      return await this.prisma.course.findMany({
+      return await this.prismaService.course.findMany({
         include: { Company: true }, // Rescatado del método 2
       });
     }
 
     // 2. Si es Admin/Empleado normal, solo ve los cursos de su empresa
-    return await this.prisma.course.findMany({
+    return await this.prismaService.course.findMany({
       where: {
         companyId: requestUser.companyId,
       },
@@ -45,7 +45,7 @@ export class CoursesService {
   }
 
   async findOne(id: string, requestUser: User) {
-    const course = await this.prisma.course.findUnique({
+    const course = await this.prismaService.course.findUnique({
       where: { id },
       include: { Company: true }, // Rescatado del método 2
     });
@@ -79,7 +79,7 @@ export class CoursesService {
       throw new ForbiddenException('No tienes permisos para actualizar cursos');
     }
 
-    return this.prisma.course.update({
+    return this.prismaService.course.update({
       where: { id: course.id },
       data: updateCourseDto,
     });
@@ -94,7 +94,7 @@ export class CoursesService {
       throw new ForbiddenException('No tienes permisos para eliminar cursos');
     }
 
-    return this.prisma.course.delete({
+    return this.prismaService.course.delete({
       where: { id: course.id },
     });
   }
