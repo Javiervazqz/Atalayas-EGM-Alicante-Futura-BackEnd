@@ -1,14 +1,11 @@
 import {
   Injectable,
-  UseGuards,
-  BadRequestException,
   ForbiddenException,
   NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
@@ -16,7 +13,7 @@ import { AuthService } from 'src/auth/auth.service';
 export class UsersService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
   ) {}
 
   async create(createUserDto: CreateUserDto, requestUser: User) {
@@ -30,36 +27,59 @@ export class UsersService {
       createUserDto.email,
       password,
     );
-    try{
-    const newUser = await this.prismaService.user.create({
-      data: {
-        id: authUser.id,
-        email: createUserDto.email,
-        name: createUserDto.name,
-        companyId: requestUser.companyId,
-      },
+    try {
+      const newUser = await this.prismaService.user.create({
+        data: {
+          id: authUser.id,
+          email: createUserDto.email,
+          name: createUserDto.name,
+          companyId: requestUser.companyId,
+        },
+      });
+
+      return {
+        ...newUser,
+        provisionalPassword: password,
+      };
+    } catch {
+      if (authUser?.id) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        await this.authService.deleteUser(authUser.id);
+      }
+      throw new InternalServerErrorException('Error al crear el usuario');
+    }
+  }
+
+  async findAll() {
+    return await this.prismaService.user.findMany();
+  }
+
+  async findOne(id: string) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id },
+      include: { Company: true },
     });
 
-    return {
-      ...newUser,
-      provisionalPassword: password,
-    };
-
+    if (!user) {
+      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
+    }
+    return user;
   }
 
-  findAll() {
-    return `This action returns all users`;
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    await this.findOne(id); // Verificamos que existe antes de actualizar
+
+    return this.prismaService.user.update({
+      where: { id },
+      data: updateUserDto,
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
-  }
+  async remove(id: string) {
+    await this.findOne(id); // Verificamos que existe antes de borrar
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+    return this.prismaService.user.delete({
+      where: { id },
+    });
   }
 }
