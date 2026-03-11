@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseGuards,
-} from '@nestjs/common';
+import {Controller,Get,Post,Body,Patch,Param,Delete,UseGuards} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -17,7 +8,6 @@ import { Roles } from 'src/auth/roles.decorator';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from '@nestjs/common';
 import { Req } from '@nestjs/common';
-
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
 @Controller('users')
@@ -27,26 +17,28 @@ export class UsersController {
   @Post()
   @Roles('ADMIN', 'GENERAL_ADMIN')
   async create(@Body() createUserDto: CreateUserDto, @Req() request: Request) {
-    return this.usersService.create(createUserDto, request['user']);
+    return await this.usersService.create(createUserDto, request['user']);
   }
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  async findAll(@Req() request: Request) {
+    return await this.usersService.findAll(request['user']);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() request: Request) {
+    return await this.usersService.findOne(id, request['user']);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  @Roles('ADMIN', 'GENERAL_ADMIN')
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Req() request: Request) {
+    return await this.usersService.update(id, updateUserDto, request['user']);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  @Roles('ADMIN', 'GENERAL_ADMIN')
+  async remove(@Param('id') id: string, @Req() request: Request) {
+    return await this.usersService.remove(id, request['user']);
   }
 }

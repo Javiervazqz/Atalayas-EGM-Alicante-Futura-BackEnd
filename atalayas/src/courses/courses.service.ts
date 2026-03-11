@@ -56,10 +56,7 @@ export class CoursesService {
     }
 
     // 2. Seguridad: ¿Tiene permiso para ver este curso específico?
-    if (
-      requestUser.role !== 'GENERAL_ADMIN' &&
-      course.companyId !== requestUser.companyId
-    ) {
+    if (requestUser.role !== 'GENERAL_ADMIN' && course.companyId !== requestUser.companyId) {
       throw new ForbiddenException('No tienes permisos para ver este curso');
     }
 

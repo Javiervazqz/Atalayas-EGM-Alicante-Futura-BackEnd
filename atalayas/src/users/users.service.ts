@@ -51,11 +51,26 @@ export class UsersService {
     }
   }
 
-  async findAll() {
-    return await this.prismaService.user.findMany();
+  async findAll(requestUser: User) {
+    if (requestUser.role === 'GENERAL_ADMIN') {
+      return await this.prismaService.user.findMany({
+        include: { Company: true },
+      });
+    }
+    if(requestUser.role === 'ADMIN') {
+    return await this.prismaService.user.findMany({
+      where: {
+        companyId: requestUser.companyId,
+      },
+      include: { Company: true },
+    });
+    }
+    else{
+    throw new ForbiddenException('No tienes permisos para ver los usuarios');
+    }
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, requestUser: User) {
     const user = await this.prismaService.user.findUnique({
       where: { id },
       include: { Company: true },
@@ -64,11 +79,18 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     }
+    if(requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException('No tienes permisos para ver este usuario');
+    }
     return user;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto) {
-    await this.findOne(id); // Verificamos que existe antes de actualizar
+  async update(id: string, updateUserDto: UpdateUserDto, requestUser: User) {
+    await this.findOne(id, requestUser); // Verificamos que existe antes de actualizar
+
+    if(requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException('No tienes permisos para actualizar este usuario');
+    }
 
     return this.prismaService.user.update({
       where: { id },
@@ -76,9 +98,13 @@ export class UsersService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id); // Verificamos que existe antes de borrar
+  async remove(id: string, requestUser: User) {
+    await this.findOne(id, requestUser); // Verificamos que existe antes de borrar
 
+    if(requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException('No tienes permisos para eliminar este usuario');
+     }
+     
     return this.prismaService.user.delete({
       where: { id },
     });

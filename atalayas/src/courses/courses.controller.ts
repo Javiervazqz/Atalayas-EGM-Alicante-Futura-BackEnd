@@ -26,33 +26,33 @@ export class CoursesController {
 
   @Post()
   @Roles('ADMIN', 'GENERAL_ADMIN')
-  create(@Body() createCourseDto: CreateCourseDto, @Req() req: Request) {
-    return this.coursesService.create(createCourseDto, req['user']);
+  async create(@Body() createCourseDto: CreateCourseDto, @Req() req: Request) {
+    return await this.coursesService.create(createCourseDto, req['user']);
   }
 
   @Get()
-  findAll(@Req() req: Request) {
-    return this.coursesService.findAll(req['user']);
+  async findAll(@Req() req: Request) {
+    return await this.coursesService.findAll(req['user']);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req: Request) {
-    return this.coursesService.findOne(id, req['user']);
+  async findOne(@Param('id') id: string, @Req() req: Request) {
+    return await this.coursesService.findOne(id, req['user']);
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'GENERAL_ADMIN')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateCourseDto: UpdateCourseDto,
     @Req() req: Request,
   ) {
-    return this.coursesService.update(id, updateCourseDto, req['user']);
+    return await this.coursesService.update(id, updateCourseDto, req['user']);
   }
 
   @Delete(':id')
   @Roles('ADMIN', 'GENERAL_ADMIN')
-  remove(@Param('id') id: string, @Req() req: Request) {
-    return this.coursesService.remove(id, req['user']);
+  async remove(@Param('id') id: string, @Req() req: Request) {
+    return await this.coursesService.remove(id, req['user']);
   }
 }
