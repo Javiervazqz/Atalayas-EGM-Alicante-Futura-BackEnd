@@ -61,7 +61,7 @@ export class UserService {
       });
       return newUser;
     } catch {
-      // Si algo falla en Prisma (ej: el companyId no existe), borramos el usuario de Auth para no dejar rastro
+      // Si algo falla en Prisma (ej: el companyId no existe), borramos el usuario de Auth para no dejar 
       if (authData?.user?.id) {
         await this.supabase.auth.admin.deleteUser(authData.user.id);
       }
