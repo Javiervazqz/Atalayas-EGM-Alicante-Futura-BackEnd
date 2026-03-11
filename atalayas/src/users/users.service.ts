@@ -1,4 +1,4 @@
-import { Injectable, UseGuards, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, UseGuards, BadRequestException, ForbiddenException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RolesGuard } from '../auth/roles.guard';
@@ -6,13 +6,12 @@ import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
-
 @Injectable()
 export class UsersService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly authService: AuthService
-  ) {}
+    ) {}
 
   async create(createUserDto: CreateUserDto, requestUser: User) {
     if(requestUser.role === 'EMPLOYEE') {
@@ -25,7 +24,7 @@ export class UsersService {
       createUserDto.email,
       password
     );
-
+    try{
     const newUser = await this.prismaService.user.create({
       data: {
       id: authUser.id,
@@ -39,6 +38,15 @@ export class UsersService {
       ...newUser,
       provisionalPassword: password
     };
+  }
+  catch {
+    if (authUser?.id) {
+            await this.authService.deleteUser(authUser.id);
+          }
+          throw new InternalServerErrorException(
+            'Error al guardar el perfil del usuario. Se ha revertido la operación.',
+          );
+  }
 
   }
   
