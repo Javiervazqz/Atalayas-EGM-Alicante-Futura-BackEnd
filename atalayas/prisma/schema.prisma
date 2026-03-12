@@ -493,7 +493,7 @@ model Document {
 }
 
 model Enrollment {
-  progress         Int    @default(0)
+  progress         Int?   @default(0)
   id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String @unique @db.Uuid
   courseId         String @unique @db.Uuid
@@ -512,23 +512,36 @@ model User {
   createdAt  DateTime    @default(now())
   id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId  String      @db.Uuid
+  avatarUrl  String?
   Document   Document[]
   Enrollment Enrollment?
   Company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  users      users       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users      users       @relation(fields: [id], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }
 
 model Content {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  title      String
-  pdfUrl     String?
-  videoUrl   String?
-  order      Int      @db.SmallInt
-  courseId   String   @db.Uuid
-  Course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at   DateTime      @default(now()) @db.Timestamptz(6)
+  title        String
+  order        Int           @db.SmallInt
+  courseId     String        @db.Uuid
+  Course       Course        @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ContentBlock ContentBlock?
+
+  @@schema("public")
+}
+
+model ContentBlock {
+  id          String      @id(map: "contentBlock_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  contentType contentType
+  url         String?
+  test        Json?       @db.Json
+  order       Int         @db.SmallInt
+  contentId   String      @db.Uuid
+  Content     Content     @relation(fields: [id], references: [id], onDelete: Cascade, map: "contentBlock_id_fkey")
 
   @@schema("public")
 }
@@ -607,6 +620,15 @@ enum Role {
   ADMIN
   EMPLOYEE
   GENERAL_ADMIN
+
+  @@schema("public")
+}
+
+enum contentType {
+  PDF
+  VIDEO
+  PODCAST
+  TEST
 
   @@schema("public")
 }
