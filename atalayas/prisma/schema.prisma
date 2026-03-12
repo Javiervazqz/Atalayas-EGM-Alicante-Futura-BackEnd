@@ -515,7 +515,7 @@ model User {
   Document   Document[]
   Enrollment Enrollment?
   Company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  users      users       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users      users       @relation(fields: [id], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }

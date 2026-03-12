@@ -7,7 +7,8 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { User } from '@prisma/client';
+// Importamos Role (el Enum de Prisma) y User
+import { User, Role } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
 
 @Injectable()
@@ -18,8 +19,25 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto, requestUser: User) {
+    // 1. Empleados fuera
     if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('No tienes permisos para crear usuarios');
+    }
+
+    // 2. Multitenancy estricto: ¿A qué empresa va este nuevo usuario?
+    let finalCompanyId: string;
+
+    if (requestUser.role === 'GENERAL_ADMIN') {
+      // El General Admin DEBE proporcionar una empresa a la que asignar el usuario
+      if (!createUserDto.companyId || createUserDto.companyId === '') {
+        throw new ForbiddenException(
+          'Un GENERAL_ADMIN debe especificar el companyId al crear un usuario',
+        );
+      }
+      finalCompanyId = createUserDto.companyId;
+    } else {
+      // Un ADMIN normal SIEMPRE crea usuarios para su propia empresa (ignorando el DTO)
+      finalCompanyId = requestUser.companyId;
     }
 
     const password = Math.random().toString(36).slice(-8);
@@ -28,13 +46,16 @@ export class UsersService {
       createUserDto.email,
       password,
     );
+
     try {
       const newUser = await this.prismaService.user.create({
         data: {
           id: authUser.id,
           email: createUserDto.email,
           name: createUserDto.name,
-          companyId: requestUser.companyId,
+          companyId: finalCompanyId,
+          // ✅ Corrección de tipo: Casteamos el string a Role para Prisma
+          role: (createUserDto.role as Role) || Role.EMPLOYEE,
         },
       });
 
@@ -44,10 +65,11 @@ export class UsersService {
       };
     } catch {
       if (authUser?.id) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         await this.authService.deleteUser(authUser.id);
       }
-      throw new InternalServerErrorException('Error al crear el usuario');
+      throw new InternalServerErrorException(
+        'Error al crear el usuario en la base de datos',
+      );
     }
   }
 
@@ -57,20 +79,26 @@ export class UsersService {
         include: { Company: true },
       });
     }
-    if(requestUser.role === 'ADMIN') {
-    return await this.prismaService.user.findMany({
-      where: {
-        companyId: requestUser.companyId,
-      },
-      include: { Company: true },
-    });
+
+    if (requestUser.role === 'ADMIN') {
+      return await this.prismaService.user.findMany({
+        where: {
+          companyId: requestUser.companyId,
+        },
+        include: { Company: true },
+      });
     }
-    else{
+
     throw new ForbiddenException('No tienes permisos para ver los usuarios');
-    }
   }
 
   async findOne(id: string, requestUser: User) {
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException(
+        'Los empleados no pueden buscar otros usuarios',
+      );
+    }
+
     const user = await this.prismaService.user.findUnique({
       where: { 
         id,
@@ -82,33 +110,48 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado o no tienes permisos para verlo`);
     }
-    
-    if(requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException('No tienes permisos para ver este usuario');
+
+    // 🔒 NUEVO ESCUDO: Un Admin normal no puede cotillear usuarios de otras empresas
+    if (
+      requestUser.role !== 'GENERAL_ADMIN' &&
+      user.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException('Este usuario pertenece a otra empresa.');
     }
+
     return user;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto, requestUser: User) {
-    await this.findOne(id, requestUser); // Verificamos que existe antes de actualizar
+    // findOne ya hace las validaciones de si existe, si soy empleado y si es de mi empresa
+    await this.findOne(id, requestUser);
 
-    if(requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException('No tienes permisos para actualizar este usuario');
+    // Creamos una copia de los datos para poder manipularlos sin errores de tipado
+    const updateData = { ...updateUserDto };
+
+    // Evitamos que un Admin normal se cambie de empresa haciendo trampas en el update
+    if (requestUser.role !== 'GENERAL_ADMIN' && updateData.companyId) {
+      delete updateData.companyId; // Borramos el intento de hackeo silenciosamente
     }
 
     return this.prismaService.user.update({
       where: { id },
-      data: updateUserDto,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      data: updateData as any,
     });
   }
 
   async remove(id: string, requestUser: User) {
-    await this.findOne(id, requestUser); // Verificamos que existe antes de borrar
+    // findOne hace todo el trabajo de seguridad por nosotros
+    await this.findOne(id, requestUser);
 
-    if(requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException('No tienes permisos para eliminar este usuario');
-     }
-     
+    // No permitimos que un Admin se borre a sí mismo por error
+    if (id === requestUser.id) {
+      throw new ForbiddenException(
+        'No puedes eliminar tu propio usuario administrador',
+      );
+    }
+
     return this.prismaService.user.delete({
       where: { id },
     });
