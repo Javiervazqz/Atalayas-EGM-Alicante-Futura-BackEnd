@@ -72,13 +72,17 @@ export class UsersService {
 
   async findOne(id: string, requestUser: User) {
     const user = await this.prismaService.user.findUnique({
-      where: { id },
+      where: { 
+        id,
+        companyId: requestUser.companyId
+       },
       include: { Company: true },
     });
 
     if (!user) {
-      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
+      throw new NotFoundException(`Usuario con ID ${id} no encontrado o no tienes permisos para verlo`);
     }
+    
     if(requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('No tienes permisos para ver este usuario');
     }

@@ -13,8 +13,8 @@ import { ContentModule } from './content/content.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
-    UsersModule,
     AuthModule,
+    UsersModule,
     CompanyModule,
     CoursesModule,
     DocumentModule,

@@ -18,7 +18,7 @@ import { Request } from '@nestjs/common';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { Roles } from 'src/auth/roles.decorator';
-@ApiTags('courses')
+@ApiTags('Content')
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
 @Controller('courses/:courseId/content')
