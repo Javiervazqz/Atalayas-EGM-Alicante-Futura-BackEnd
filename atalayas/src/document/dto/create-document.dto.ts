@@ -5,8 +5,8 @@ import {
   IsUUID,
   IsBoolean,
   IsOptional,
-  IsUrl,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateDocumentDto {
   @ApiProperty({
@@ -17,14 +17,7 @@ export class CreateDocumentDto {
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty({
-    example: 'https://midominio.com/archivos/manual.pdf',
-    description: 'URL del archivo',
-  })
-  @IsUrl() // <-- Validación extra genial para asegurar que es un enlace válido
-  @IsNotEmpty()
-  fileUrl: string;
-
+  @Transform(({ value }) => value === 'true' || value === true)
   @ApiPropertyOptional({
     example: true,
     default: true,
@@ -34,14 +27,13 @@ export class CreateDocumentDto {
   @IsOptional()
   isPublic?: boolean;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '123e4567-e89b-12d3-a456-426614174000',
     description: 'ID de la empresa',
   })
   @IsUUID()
-  @IsNotEmpty()
   @IsOptional()
-  companyId: string;
+  companyId?: string;
 
   @ApiPropertyOptional({
     example: '123e4567-e89b-12d3-a456-426614174001',

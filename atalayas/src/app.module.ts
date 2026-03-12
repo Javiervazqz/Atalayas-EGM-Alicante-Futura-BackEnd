@@ -7,6 +7,7 @@ import { CoursesModule } from './courses/courses.module';
 import { DocumentModule } from './document/document.module';
 import { CompanyModule } from './company/company.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
+import { StorageModule } from './storage/storage.module';
 import { ContentModule } from './content/content.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { ContentModule } from './content/content.module';
     CoursesModule,
     DocumentModule,
     EnrollmentModule,
+    StorageModule,
     ContentModule,
   ],
   controllers: [],

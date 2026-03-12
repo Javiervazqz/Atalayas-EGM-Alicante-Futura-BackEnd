@@ -6,9 +6,10 @@ import { ConfigModule } from '@nestjs/config';
 // Importamos los módulos de seguridad y base de datos
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { StorageModule } from '../storage/storage.module.js';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, AuthModule],
+  imports: [ConfigModule, PrismaModule, AuthModule, StorageModule],
   controllers: [DocumentController],
   providers: [DocumentService],
 })
