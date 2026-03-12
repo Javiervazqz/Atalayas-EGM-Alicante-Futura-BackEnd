@@ -2,60 +2,90 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException, // Añadido
 } from '@nestjs/common';
 import { CreateDocumentDto } from './dto/create-document.dto.js';
 import { UpdateDocumentDto } from './dto/update-document.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { User } from '@prisma/client';
+import { StorageService } from '../storage/storage.service.js'; // 1. Importamos el StorageService
+import 'multer';
 
 @Injectable()
 export class DocumentService {
-  constructor(private readonly prisma: PrismaService) {}
+  // 2. Inyectamos el StorageService en el constructor
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
-  async create(createDocumentDto: CreateDocumentDto, requestUser: User) {
-    // 1. Los empleados rasos no suben documentos
+  async create(
+    createDocumentDto: CreateDocumentDto,
+    requestUser: User,
+    file: Express.Multer.File,
+  ) {
     if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException(
         'Los empleados no tienen permiso para subir documentos',
       );
     }
 
-    // 2. Multitenancy: El ID de la empresa será el del usuario que lo crea
-    // (A menos que sea el GENERAL_ADMIN, que puede elegir la empresa)
-    const finalCompanyId =
-      requestUser.role === 'GENERAL_ADMIN' && createDocumentDto.companyId
-        ? createDocumentDto.companyId
-        : requestUser.companyId;
-
-    // 3. Validar que el usuario asociado exista (si se envía uno)
-    if (createDocumentDto.userId) {
-      const userExists = await this.prisma.user.findUnique({
-        where: { id: createDocumentDto.userId },
-      });
-      if (!userExists) {
-        throw new NotFoundException(
-          `Usuario con ID ${createDocumentDto.userId} no encontrado`,
-        );
-      }
+    if (!file) {
+      throw new BadRequestException('El archivo físico es obligatorio');
     }
 
+    let finalCompanyId: string | null = null;
+    if (requestUser.role === 'GENERAL_ADMIN') {
+      // Si es SuperAdmin y manda un UUID, lo usamos. Si lo deja vacío, es global (null)
+      finalCompanyId =
+        createDocumentDto.companyId && createDocumentDto.companyId !== ''
+          ? createDocumentDto.companyId
+          : null;
+    } else {
+      // Si es Admin normal, SIEMPRE se guarda en su empresa, ponga lo que ponga
+      finalCompanyId = requestUser.companyId;
+    }
+
+    // 1. Gestionar el ID del Usuario (Opcional)
+    let finalUserId: string | null = null;
+    if (createDocumentDto.userId && createDocumentDto.userId !== '') {
+      const targetUser = await this.prisma.user.findUnique({
+        where: { id: createDocumentDto.userId },
+      });
+      if (!targetUser) throw new NotFoundException(`Usuario no encontrado`);
+      if (finalCompanyId !== null && targetUser.companyId !== finalCompanyId) {
+        throw new ForbiddenException(
+          'Imposible, el empleado seleccionado pertenece a otra empresa.',
+        );
+      }
+      finalUserId = createDocumentDto.userId;
+    }
+
+    // 3. Subir el archivo a Supabase
+    const fileUrl = await this.storageService.uploadFile(file);
+
+    // 4. Casting del booleano (Swagger multipart envía texto)
+    const isPublic = String(createDocumentDto.isPublic) === 'true';
+
+    // 5. Guardar en Prisma permitiendo los nulls
     return this.prisma.document.create({
       data: {
-        ...createDocumentDto,
-        companyId: finalCompanyId, // Lo inyectamos forzosamente seguro
+        title: createDocumentDto.title,
+        fileUrl: fileUrl,
+        isPublic: isPublic,
+        companyId: finalCompanyId,
+        userId: finalUserId,
       },
     });
   }
 
   async findAll(requestUser: User) {
-    // Si es super admin, lo ve todo
     if (requestUser.role === 'GENERAL_ADMIN') {
       return this.prisma.document.findMany({
         include: { Company: true, User: true },
       });
     }
 
-    // Si es normal, solo ve los de su empresa
     return this.prisma.document.findMany({
       where: { companyId: requestUser.companyId },
       include: { Company: true, User: true },
@@ -72,7 +102,6 @@ export class DocumentService {
       throw new NotFoundException('Documento no encontrado');
     }
 
-    // Seguridad: ¿Es de mi empresa?
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
       document.companyId !== requestUser.companyId
@@ -90,10 +119,8 @@ export class DocumentService {
     updateDocumentDto: UpdateDocumentDto,
     requestUser: User,
   ) {
-    // findOne ya valida que exista y que sea de tu empresa
     await this.findOne(id, requestUser);
 
-    // Los empleados no editan
     if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('Los empleados no pueden editar documentos');
     }
@@ -105,14 +132,20 @@ export class DocumentService {
   }
 
   async remove(id: string, requestUser: User) {
-    // findOne ya valida que exista y que sea de tu empresa
-    await this.findOne(id, requestUser);
+    // 1. Buscamos el documento. Si no existe o no es de su empresa, findOne lanzará un error y parará aquí.
+    const document = await this.findOne(id, requestUser);
 
-    // Los empleados no borran
+    // 2. Seguridad extra: Los empleados no pueden borrar
     if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('Los empleados no pueden borrar documentos');
     }
 
+    // 3. ELIMINACIÓN FÍSICA: Borramos el archivo de Supabase usando la URL que guardamos
+    if (document.fileUrl) {
+      await this.storageService.deleteFile(document.fileUrl);
+    }
+
+    // 4. ELIMINACIÓN LÓGICA: Borramos la fila en la base de datos
     return this.prisma.document.delete({
       where: { id },
     });

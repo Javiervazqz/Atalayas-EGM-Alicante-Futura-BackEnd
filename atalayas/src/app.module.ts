@@ -7,6 +7,7 @@ import { CoursesModule } from './courses/courses.module';
 import { DocumentModule } from './document/document.module';
 import { CompanyModule } from './company/company.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { EnrollmentModule } from './enrollment/enrollment.module';
     CoursesModule,
     DocumentModule,
     EnrollmentModule,
+    StorageModule,
   ],
   controllers: [],
   providers: [],
