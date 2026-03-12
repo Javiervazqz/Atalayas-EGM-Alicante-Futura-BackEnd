@@ -9,6 +9,9 @@ export class AuthGuard implements CanActivate {
         const request = context.switchToHttp().getRequest();
         const authHeader = request.headers.authorization;
 
+        console.log('URL:', request.url); // 👈
+        console.log('AuthHeader:', authHeader);
+
         if(!authHeader) return false;
 
         const token = authHeader.split(' ')[1];
@@ -22,6 +25,8 @@ export class AuthGuard implements CanActivate {
         const publicUser = await this.prismaService.user.findUnique({
             where: { id: authUser.id },
         });
+        console.log('Usuario autenticado:', publicUser);
+        console.log('UserID:', authUser.id);
 
         if(!publicUser) return false;
 

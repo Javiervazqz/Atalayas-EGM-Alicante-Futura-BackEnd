@@ -100,12 +100,15 @@ export class UsersService {
     }
 
     const user = await this.prismaService.user.findUnique({
-      where: { id },
+      where: { 
+        id,
+        companyId: requestUser.companyId
+       },
       include: { Company: true },
     });
 
     if (!user) {
-      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
+      throw new NotFoundException(`Usuario con ID ${id} no encontrado o no tienes permisos para verlo`);
     }
 
     // 🔒 NUEVO ESCUDO: Un Admin normal no puede cotillear usuarios de otras empresas

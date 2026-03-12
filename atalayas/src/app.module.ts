@@ -8,18 +8,20 @@ import { DocumentModule } from './document/document.module';
 import { CompanyModule } from './company/company.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
 import { StorageModule } from './storage/storage.module';
+import { ContentModule } from './content/content.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
-    UsersModule,
     AuthModule,
+    UsersModule,
     CompanyModule,
     CoursesModule,
     DocumentModule,
     EnrollmentModule,
     StorageModule,
+    ContentModule,
   ],
   controllers: [],
   providers: [],

@@ -7,6 +7,7 @@ import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js'; // Ajusta la ruta a tu proyecto
 import { User } from '@prisma/client';
+import { request } from 'http';
 
 @Injectable()
 export class CoursesService {
@@ -18,11 +19,19 @@ export class CoursesService {
       throw new ForbiddenException('No tienes permisos para crear cursos');
     }
 
+    const companyId = requestUser.role === 'GENERAL_ADMIN' && createCourseDto.companyId
+      ? createCourseDto.companyId
+      : requestUser.companyId;
+
+      if(!companyId) {
+        throw new ForbiddenException('No puedes asignar un curso a una empresa sin especificar un ID de empresa válido');
+      }
+
     // 2. Multitenancy: Forzamos el ID de la empresa del usuario creador
     return await this.prismaService.course.create({
       data: {
-        ...createCourseDto, // Expandimos los demás datos del DTO (title, description, etc.)
-        companyId: requestUser.companyId, // Sobrescribimos/Inyectamos el ID seguro
+        title: createCourseDto.title,
+        companyId,
       },
     });
   }
