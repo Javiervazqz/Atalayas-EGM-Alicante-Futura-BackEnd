@@ -40,6 +40,7 @@ export class CreateDocumentDto {
   })
   @IsUUID()
   @IsNotEmpty()
+  @IsOptional()
   companyId: string;
 
   @ApiPropertyOptional({

@@ -4,7 +4,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CoursesModule } from './courses/courses.module';
+import { DocumentModule } from './document/document.module';
 import { CompanyModule } from './company/company.module';
+import { EnrollmentModule } from './enrollment/enrollment.module';
 import { ContentModule } from './content/content.module';
 
 @Module({
@@ -13,8 +15,10 @@ import { ContentModule } from './content/content.module';
     PrismaModule,
     UsersModule,
     AuthModule,
-    CoursesModule,
     CompanyModule,
+    CoursesModule,
+    DocumentModule,
+    EnrollmentModule,
     ContentModule,
   ],
   controllers: [],
