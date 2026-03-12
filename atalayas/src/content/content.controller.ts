@@ -7,42 +7,53 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { ContentService } from './content.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
-import { ApiTags } from '@nestjs/swagger';
-
-@ApiTags('Content')
-@Controller('content')
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Request } from '@nestjs/common';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { AuthGuard } from 'src/auth/auth.guard';
+import { Roles } from 'src/auth/roles.decorator';
+@ApiTags('courses')
+@ApiBearerAuth()
+@UseGuards(AuthGuard, RolesGuard)
+@Controller('courses/:courseId/content')
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 
   @Post()
-  create(@Body() createContentDto: CreateContentDto) {
-    return this.contentService.create(createContentDto);
+  @Roles ('ADMIN', 'GENERAL_ADMIN')
+  async create(@Body() createContentDto: CreateContentDto, @Req() req: Request, @Param('courseId') courseId: string) {
+    return this.contentService.create(createContentDto, req['user'], courseId);
   }
 
   @Get()
-  findAll() {
-    return this.contentService.findAll();
+  async findAll(@Req() req: Request, @Param('courseId', ParseUUIDPipe) courseId: string) {
+    return this.contentService.findAll(req['user'], courseId);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.contentService.findOne(id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.contentService.findOne(id, req['user']);
   }
 
   @Patch(':id')
-  update(
+  @Roles ('ADMIN', 'GENERAL_ADMIN')
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateContentDto: UpdateContentDto,
+    @Req() req: Request
   ) {
-    return this.contentService.update(id, updateContentDto);
+    return this.contentService.update(id, updateContentDto, req['user']);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.contentService.remove(id);
+  @Roles ('ADMIN', 'GENERAL_ADMIN')
+  async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.contentService.remove(id, req['user']);
   }
 }

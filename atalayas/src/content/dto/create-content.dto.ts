@@ -1,12 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsString,
-  IsNotEmpty,
-  IsUUID,
-  IsOptional,
-  IsUrl,
-  IsInt,
-} from 'class-validator';
+import {IsString, IsNotEmpty, IsOptional, IsUrl, IsInt} from 'class-validator';
 
 export class CreateContentDto {
   @ApiProperty({
@@ -32,17 +25,4 @@ export class CreateContentDto {
   @IsUrl()
   @IsOptional()
   videoUrl?: string;
-
-  @ApiProperty({ example: 1, description: 'Orden de aparición en el curso' })
-  @IsInt()
-  @IsNotEmpty()
-  order: number;
-
-  @ApiProperty({
-    example: '123e4567-e89b-12d3-a456-426614174000',
-    description: 'ID del curso al que pertenece',
-  })
-  @IsUUID()
-  @IsNotEmpty()
-  courseId: string;
 }
