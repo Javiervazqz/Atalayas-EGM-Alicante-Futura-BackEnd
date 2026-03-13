@@ -1,6 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { RegisterDto } from './dto/register.dto';
+import { emitWarning } from 'process';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -60,6 +63,38 @@ export class AuthService {
 
     return data.user;
   }
+
+  async registerPublicUser(registerDto: RegisterDto) {
+    const { data, error } = await this.supabase.auth.signUp({
+      email: registerDto.email,
+      password: registerDto.password,
+    });
+
+    if(error) throw new UnauthorizedException(error.message);
+    try{
+      const newUser = await this.prismaService.user.create({ 
+        data: {
+          id: data.user!.id,
+          email: registerDto.email,
+          name:registerDto.email.split('@')[0], // Asignamos el nombre por defecto como la parte antes del @ del email
+          role: Role.PUBLIC,
+          companyId: null,
+        }
+      });
+    
+    return {
+      id:newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+    };
+  }
+  catch {
+    if (data?.user?.id) {
+      await this.deleteUser(data.user!.id);
+      throw new InternalServerErrorException('Error al crear el usuario en la base de datos');
+    }
+  }
+}
 
   async deleteUser(id: string) {
     const { error } = await this.supabaseAdmin.auth.admin.deleteUser(id);

@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 // Importamos Role (el Enum de Prisma) y User
 import { User, Role } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
+import { request } from 'node:http';
 
 @Injectable()
 export class UsersService {
@@ -20,24 +21,32 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto, requestUser: User) {
     // 1. Empleados fuera
-    if (requestUser.role === 'EMPLOYEE') {
+    if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear usuarios');
     }
 
     // 2. Multitenancy estricto: ¿A qué empresa va este nuevo usuario?
-    let finalCompanyId: string;
+    let finalCompanyId: string | null;
+    let finalRole: Role;
 
     if (requestUser.role === 'GENERAL_ADMIN') {
       // El General Admin DEBE proporcionar una empresa a la que asignar el usuario
-      if (!createUserDto.companyId || createUserDto.companyId === '') {
+      if (!createUserDto.companyId) {
         throw new ForbiddenException(
           'Un GENERAL_ADMIN debe especificar el companyId al crear un usuario',
         );
       }
       finalCompanyId = createUserDto.companyId;
+      finalRole = (createUserDto.role as Role) || Role.EMPLOYEE;
     } else {
-      // Un ADMIN normal SIEMPRE crea usuarios para su propia empresa (ignorando el DTO)
+      if(requestUser.role === 'ADMIN' && !requestUser.companyId) {
+        throw new ForbiddenException('Tu usuario no tiene una empresa asignada.');
+      }
       finalCompanyId = requestUser.companyId;
+      if(createUserDto.role === 'GENERAL_ADMIN'){
+        throw new ForbiddenException('No puedes crear un usuario con rol GENERAL_ADMIN');
+      }
+      finalRole = (createUserDto.role as Role) || Role.EMPLOYEE;
     }
 
     const password = Math.random().toString(36).slice(-8);
@@ -54,8 +63,7 @@ export class UsersService {
           email: createUserDto.email,
           name: createUserDto.name,
           companyId: finalCompanyId,
-          // ✅ Corrección de tipo: Casteamos el string a Role para Prisma
-          role: (createUserDto.role as Role) || Role.EMPLOYEE,
+          role: finalRole,
         },
       });
 
@@ -102,7 +110,6 @@ export class UsersService {
     const user = await this.prismaService.user.findUnique({
       where: { 
         id,
-        companyId: requestUser.companyId
        },
       include: { Company: true },
     });
@@ -111,13 +118,9 @@ export class UsersService {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado o no tienes permisos para verlo`);
     }
 
-    // 🔒 NUEVO ESCUDO: Un Admin normal no puede cotillear usuarios de otras empresas
-    if (
-      requestUser.role !== 'GENERAL_ADMIN' &&
-      user.companyId !== requestUser.companyId
-    ) {
-      throw new ForbiddenException('Este usuario pertenece a otra empresa.');
-    }
+    if (requestUser.role === 'ADMIN' && user.companyId !== requestUser.companyId) {
+    throw new ForbiddenException('Este usuario pertenece a otra empresa.');
+  }
 
     return user;
   }
@@ -142,7 +145,6 @@ export class UsersService {
   }
 
   async remove(id: string, requestUser: User) {
-    // findOne hace todo el trabajo de seguridad por nosotros
     await this.findOne(id, requestUser);
 
     // No permitimos que un Admin se borre a sí mismo por error
@@ -152,8 +154,12 @@ export class UsersService {
       );
     }
 
-    return this.prismaService.user.delete({
+    await this.prismaService.user.delete({
       where: { id },
     });
+
+    await this.authService.deleteUser(id);
+
+    return { message: 'Usuario eliminado correctamente' };
   }
 }
