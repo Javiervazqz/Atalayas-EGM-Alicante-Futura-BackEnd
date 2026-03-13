@@ -15,9 +15,12 @@ import { EnrollmentService } from './enrollment.service.js';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto.js';
 import { UpdateEnrollmentDto } from './dto/update-enrollment.dto.js';
 import { Request } from 'express';
+import { GetUser } from '../auth/get-user.decorator';
 
 import { AuthGuard } from '../auth/auth.guard.js';
-import { User } from '@prisma/client';
+import type { User } from '@prisma/client';
+import { UpdateVideoProgressDto } from './dto/update-video-progress.dto.js';
+import { CompleteManualLessonDto } from './dto/complete-manual-lesson.dto.js';
 
 @ApiTags('Enrollment')
 @ApiBearerAuth()
@@ -71,5 +74,33 @@ export class EnrollmentController {
     @Req() req: Request & { user: User },
   ) {
     return this.enrollmentService.remove(id, req.user);
+  }
+
+  @Patch('video-progress')
+  @ApiOperation({ summary: 'Actualizar el segundero de un vídeo' })
+  async updateVideoProgress(
+    @GetUser() user: User,
+    @Body() updateDto: UpdateVideoProgressDto,
+  ) {
+    // 3. Añadimos el await para que ESLint no se queje
+    return await this.enrollmentService.updateVideoProgress(
+      user.id,
+      updateDto.contentId,
+      updateDto.lastTime,
+      updateDto.totalDuration,
+    );
+  }
+
+  @Post('complete-manual')
+  @ApiOperation({ summary: 'Marcar lección manual como completada' })
+  async completeManual(
+    @GetUser() user: User,
+    @Body() completeDto: CompleteManualLessonDto,
+  ) {
+    // 4. Corregimos el nombre al que pusimos en el Service: completeManualLesson
+    return await this.enrollmentService.completeManualLesson(
+      user.id,
+      completeDto.contentId,
+    );
   }
 }
