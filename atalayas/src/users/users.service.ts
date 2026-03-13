@@ -37,7 +37,7 @@ export class UsersService {
       finalCompanyId = createUserDto.companyId;
     } else {
       // Un ADMIN normal SIEMPRE crea usuarios para su propia empresa (ignorando el DTO)
-      finalCompanyId = requestUser.companyId;
+      finalCompanyId = requestUser.companyId ?? '';
     }
 
     const password = Math.random().toString(36).slice(-8);
