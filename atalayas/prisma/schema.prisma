@@ -533,6 +533,7 @@ model Content {
   Course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@schema("public")
+  userProgresses UserProgress[]
 }
 
 model UserProgress {
@@ -625,15 +626,6 @@ enum Role {
   EMPLOYEE
   GENERAL_ADMIN
   PUBLIC
-
-  @@schema("public")
-}
-
-enum contentType {
-  PDF
-  VIDEO
-  PODCAST
-  TEST
 
   @@schema("public")
 }

@@ -150,5 +150,9 @@ export class EnrollmentService {
     const content = await this.prisma.content.findUnique({
       where: { id: contentId },
     });
+
+    if (!content) {
+      throw new NotFoundException('Contenido no encontrado');
+    }
   }
 }
