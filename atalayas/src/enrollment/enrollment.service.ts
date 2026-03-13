@@ -145,4 +145,10 @@ export class EnrollmentService {
       where: { id },
     });
   }
+
+  async completeLesson(userId: string, contentId: string) {
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId },
+    });
+  }
 }
