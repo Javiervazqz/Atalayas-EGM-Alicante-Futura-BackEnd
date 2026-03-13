@@ -146,13 +146,86 @@ export class EnrollmentService {
     });
   }
 
-  async completeLesson(userId: string, contentId: string) {
-    const content = await this.prisma.content.findUnique({
-      where: { id: contentId },
+  // 1. MÉTODO PARA VÍDEOS (Actualización constante)
+  async updateVideoProgress(
+    userId: string,
+    contentId: string,
+    lastTime: number,
+    totalDuration: number,
+  ) {
+    // Si ha visto más del 90%, lo marcamos como completado
+    const isCompleted = lastTime >= totalDuration * 0.9;
+
+    const progress = await this.prisma.userProgress.upsert({
+      where: { userId_contentId: { userId, contentId } },
+      update: {
+        lastTime,
+        isCompleted,
+        completedAt: isCompleted ? new Date() : undefined,
+      },
+      create: {
+        userId,
+        contentId,
+        lastTime,
+        isCompleted,
+        completedAt: isCompleted ? new Date() : undefined,
+      },
     });
 
-    if (!content) {
-      throw new NotFoundException('Contenido no encontrado');
+    // Si se completa, actualizamos la matrícula
+    if (isCompleted) {
+      await this.syncEnrollmentProgress(userId, contentId);
     }
+
+    return progress;
+  }
+
+  // 2. MÉTODO PARA MANUALES (Botón de "He terminado")
+  async completeManualLesson(userId: string, contentId: string) {
+    await this.prisma.userProgress.upsert({
+      where: { userId_contentId: { userId, contentId } },
+      update: { isCompleted: true, completedAt: new Date() },
+      create: { userId, contentId, isCompleted: true, completedAt: new Date() },
+    });
+
+    return await this.syncEnrollmentProgress(userId, contentId);
+  }
+
+  // 3. EL CORAZÓN: Sincronización de porcentajes
+  private async syncEnrollmentProgress(userId: string, contentId: string) {
+    // Buscamos el curso al que pertenece la lección
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId },
+      select: { courseId: true },
+    });
+
+    if (!content) throw new NotFoundException('Contenido no encontrado');
+
+    // Contamos el total de lecciones del curso
+    const totalLessons = await this.prisma.content.count({
+      where: { courseId: content.courseId },
+    });
+
+    // Contamos cuántas ha terminado el usuario de verdad (isCompleted = true)
+    const completedCount = await this.prisma.userProgress.count({
+      where: {
+        userId,
+        isCompleted: true,
+        Content: { courseId: content.courseId },
+      },
+    });
+
+    // Aplicamos la fórmula: progress = (completadas / totales) * 100
+    const percentage =
+      totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+
+    // Actualizamos el resumen en la tabla Enrollment
+    return await this.prisma.enrollment.update({
+      where: { userId_courseId: { userId, courseId: content.courseId } },
+      data: {
+        completedContent: completedCount,
+        progress: percentage,
+      },
+    });
   }
 }
