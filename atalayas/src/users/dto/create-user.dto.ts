@@ -1,5 +1,7 @@
-import { IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUUID, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { Transform } from 'class-transformer';
 export class CreateUserDto {
   @ApiProperty({ example: 'ejemplo@ejemplo.com' })
   @IsEmail()
@@ -9,20 +11,19 @@ export class CreateUserDto {
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({
-    example: '123e4567-e89b-12d3-a456-426614174000',
-    description:
-      'ID de la empresa (Obligatorio si eres GENERAL_ADMIN. Ignorado si eres ADMIN normal)',
-  })
-  @IsOptional()
+  @ApiProperty({ required: false, example: '' })
   @IsUUID()
+  @IsOptional()
+  @Transform(({ value }) => value || undefined)
   companyId?: string;
 
   @ApiPropertyOptional({
     example: 'EMPLOYEE',
     description: 'Rol del usuario (EMPLOYEE o ADMIN). Por defecto es EMPLOYEE.',
+    enum:[Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN],
+    required: false
   })
+  @IsEnum([Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN])
   @IsOptional()
-  @IsString() // Si tienes un Enum de roles en tu proyecto, podrías usar @IsEnum()
-  role?: string;
+  role?: Role;
 }

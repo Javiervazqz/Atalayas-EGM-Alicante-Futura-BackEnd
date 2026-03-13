@@ -9,6 +9,7 @@ import { CompanyModule } from './company/company.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
 import { StorageModule } from './storage/storage.module';
 import { ContentModule } from './content/content.module';
+import { ContentBlockModule } from './content-block/content-block.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ContentModule } from './content/content.module';
     EnrollmentModule,
     StorageModule,
     ContentModule,
+    ContentBlockModule,
   ],
   controllers: [],
   providers: [],

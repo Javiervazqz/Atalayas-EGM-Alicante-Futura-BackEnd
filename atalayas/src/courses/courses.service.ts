@@ -7,7 +7,6 @@ import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js'; // Ajusta la ruta a tu proyecto
 import { User } from '@prisma/client';
-import { request } from 'http';
 
 @Injectable()
 export class CoursesService {
@@ -39,17 +38,22 @@ export class CoursesService {
   async findAll(requestUser: User) {
     // 1. Si es Super Administrador, lo ve todo
     if (requestUser.role === 'GENERAL_ADMIN') {
+      return await this.prismaService.course.findMany();
+    }
+    if(requestUser.role === 'PUBLIC') {
       return await this.prismaService.course.findMany({
-        include: { Company: true }, // Rescatado del método 2
+        where: {
+          isPublic: true
+        },
       });
     }
-
-    // 2. Si es Admin/Empleado normal, solo ve los cursos de su empresa
     return await this.prismaService.course.findMany({
       where: {
-        companyId: requestUser.companyId,
+        OR: [
+          { companyId: requestUser.companyId },
+          { isPublic: true }
+        ]
       },
-      include: { Company: true }, // Rescatado del método 2
     });
   }
 
