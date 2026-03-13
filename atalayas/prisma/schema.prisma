@@ -512,7 +512,7 @@ model User {
   role       Role        @default(EMPLOYEE)
   createdAt  DateTime    @default(now())
   id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId  String      @db.Uuid
+  companyId  String?     @db.Uuid
   Document   Document[]
   Enrollment Enrollment[]
   Company    Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -540,6 +540,8 @@ model UserProgress {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId      String   @db.Uuid
   contentId   String   @db.Uuid
+  lastTime    Int      @default(0)
+  isCompleted Boolean  @default(false)
   completedAt DateTime @default(now()) @db.Timestamptz(6)
 
   // Relaciones
