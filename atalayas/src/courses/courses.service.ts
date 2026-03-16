@@ -13,8 +13,8 @@ export class CoursesService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async create(createCourseDto: CreateCourseDto, requestUser: User) {
-    // 1. Control de Roles: Los empleados no crean cursos
-    if (requestUser.role === 'EMPLOYEE') {
+    // 1. Control de Roles: Los empleados y públicos no crean cursos
+    if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear cursos');
     }
 
@@ -26,11 +26,20 @@ export class CoursesService {
         throw new ForbiddenException('No puedes asignar un curso a una empresa sin especificar un ID de empresa válido');
       }
 
-    // 2. Multitenancy: Forzamos el ID de la empresa del usuario creador
+      if(requestUser.role === 'GENERAL_ADMIN') {
+        createCourseDto.isPublic = createCourseDto.isPublic || false; // Si no se especifica, por defecto no es público
+      }
+
+      if(requestUser.role !== 'GENERAL_ADMIN' && createCourseDto.isPublic) {
+        throw new ForbiddenException('Solo los administradores generales pueden crear cursos públicos');
+      }
+
+    // 2. Forzamos el ID de la empresa del usuario creador
     return await this.prismaService.course.create({
       data: {
         title: createCourseDto.title,
         companyId,
+        isPublic: createCourseDto.isPublic,
       },
     });
   }

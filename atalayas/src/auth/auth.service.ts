@@ -100,4 +100,35 @@ export class AuthService {
     const { error } = await this.supabaseAdmin.auth.admin.deleteUser(id);
     if (error) throw new UnauthorizedException(error.message);
   }
+
+async handleOAuthLogin(token: string) {
+    const { data, error } = await this.supabase.auth.getUser(token);
+    if (error) throw new UnauthorizedException('Token inválido');
+    const authUser = data.user;
+    if (!authUser) throw new UnauthorizedException('Usuario no encontrado');
+
+    let publicUser = await this.prismaService.user.findUnique({
+      where: { id: authUser.id },
+    });
+
+    if(!publicUser) {
+      publicUser = await this.prismaService.user.create({
+        data: {
+          id: authUser.id,
+          email: authUser.email!,
+          name: authUser.email!.split('@')[0],
+          role: Role.PUBLIC,
+          companyId: null,
+        },
+      });
+    }
+    return {
+      user:{
+        id: publicUser.id,
+        email: publicUser.email,
+        role: publicUser.role,
+      },
+      token: token,
+    };
+}
 }

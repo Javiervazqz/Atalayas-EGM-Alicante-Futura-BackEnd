@@ -39,7 +39,6 @@ export class EnrollmentService {
     }
 
     // 3. Validar que el curso existe y pertenece a la empresa (si es ADMIN)
-    // Suponiendo que tu modelo Course tiene un campo companyId. Si no es así, coméntame y lo adaptamos.
     const targetCourse = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
