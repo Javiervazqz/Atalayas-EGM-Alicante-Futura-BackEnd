@@ -25,9 +25,7 @@ export class DocumentService {
     file: Express.Multer.File,
   ) {
     if (requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException(
-        'Los empleados no tienen permiso para subir documentos',
-      );
+      throw new ForbiddenException('No tienes permiso para subir documentos');
     }
 
     if (!file) {
@@ -35,7 +33,10 @@ export class DocumentService {
     }
 
     let finalCompanyId: string | null = null;
+    let finalIsPublic: boolean = false;
+
     if (requestUser.role === 'GENERAL_ADMIN') {
+      finalIsPublic = String(createDocumentDto.isPublic) === 'true';
       // Si es SuperAdmin y manda un UUID, lo usamos. Si lo deja vacío, es global (null)
       finalCompanyId =
         createDocumentDto.companyId && createDocumentDto.companyId !== ''
@@ -64,15 +65,11 @@ export class DocumentService {
     // 3. Subir el archivo a Supabase
     const fileUrl = await this.storageService.uploadFile(file);
 
-    // 4. Casting del booleano (Swagger multipart envía texto)
-    const isPublic = String(createDocumentDto.isPublic) === 'true';
-
-    // 5. Guardar en Prisma permitiendo los nulls
     return this.prisma.document.create({
       data: {
         title: createDocumentDto.title,
         fileUrl: fileUrl,
-        isPublic: isPublic,
+        isPublic: finalIsPublic,
         companyId: finalCompanyId,
         userId: finalUserId,
       },

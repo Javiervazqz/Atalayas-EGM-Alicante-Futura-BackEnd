@@ -508,7 +508,7 @@ model Enrollment {
 
 model User {
   email          String         @unique
-  name           String
+  name           String?        @default("Usuario")
   role           Role           @default(EMPLOYEE)
   createdAt      DateTime       @default(now())
   id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -529,8 +529,7 @@ model Content {
   title          String
   order          Int            @db.SmallInt
   courseId       String         @db.Uuid
-  pdfUrl         String?
-  videoUrl       String?
+  url            String?
   Course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   userProgresses UserProgress[]
 
