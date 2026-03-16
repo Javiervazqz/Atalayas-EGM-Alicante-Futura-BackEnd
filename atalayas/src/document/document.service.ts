@@ -24,7 +24,7 @@ export class DocumentService {
     requestUser: User,
     file: Express.Multer.File,
   ) {
-    if (requestUser.role === 'EMPLOYEE') {
+    if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permiso para subir documentos');
     }
 

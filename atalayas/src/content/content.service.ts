@@ -10,9 +10,9 @@ export class ContentService {
 
   async create(createContentDto: CreateContentDto, requestUser: User, courseId: string) {
     console.log('courseId:', courseId);
-  console.log('requestUser:', requestUser);
-  console.log('createContentDto:', createContentDto);
-    if(requestUser.role === 'EMPLOYEE') {
+    console.log('requestUser:', requestUser);
+    console.log('createContentDto:', createContentDto);
+    if(requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
     const courseExists = await this.prisma.course.findUnique({

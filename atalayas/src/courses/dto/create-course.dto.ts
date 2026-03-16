@@ -11,4 +11,8 @@ export class CreateCourseDto {
   @IsOptional()
   @Transform(({ value }) => value || undefined)
   companyId?: string;
+
+  @ApiProperty({ required: false, example: false })
+  @IsOptional()
+  isPublic?: boolean;
 }

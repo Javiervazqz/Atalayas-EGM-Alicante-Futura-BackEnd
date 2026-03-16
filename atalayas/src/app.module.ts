@@ -9,8 +9,7 @@ import { CompanyModule } from './company/company.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
 import { StorageModule } from './storage/storage.module';
 import { ContentModule } from './content/content.module';
-import { ContentBlockModule } from './content-block/content-block.module';
-
+import { ServicesModule } from './services/services.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -23,7 +22,7 @@ import { ContentBlockModule } from './content-block/content-block.module';
     EnrollmentModule,
     StorageModule,
     ContentModule,
-    ContentBlockModule,
+    ServicesModule,
   ],
   controllers: [],
   providers: [],
