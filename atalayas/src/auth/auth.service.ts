@@ -4,13 +4,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { Role } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class AuthService {
   private supabase: SupabaseClient;
   private supabaseAdmin: SupabaseClient;
 
-  constructor(private readonly prismaService: PrismaService) {
+  constructor(private readonly prismaService: PrismaService, private readonly mailerService: MailerService) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -140,11 +141,60 @@ async handleOAuthLogin(token: string) {
     const resetTokenExp = new Date();
     resetTokenExp.setHours(resetTokenExp.getHours() + 1); // El token expira en 1 hora
 
+    console.log(resetToken)
+
     await this.prismaService.user.update({
       where: { email },
-      data: { resetToken:resetToken, resetTokenExp: resetTokenExp },
+      data: { resetToken, resetTokenExp },
     });
-    return { message: 'Si el correo existe, recibirás instrucciones para restablecer tu contraseña.' };
+    
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Recuperar contraseña - Atalayas',
+        text: 'Haz clic aquí para resetear', // Siempre añade un 'text' por si acaso
+        html: `<div style="background-color: #f5f5f7; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 24px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="font-size: 24px; font-weight: 600; color: #1d1d1f; margin: 0; letter-spacing: -0.02em;">Atalayas EGM</h1>
+        </div>
+
+        <div style="height: 1px; background-color: #d2d2d7; margin-bottom: 30px;"></div>
+
+        <h2 style="font-size: 21px; font-weight: 600; color: #1d1d1f; margin-bottom: 16px; letter-spacing: -0.01em;">Restablecer contraseña</h2>
+        
+        <p style="font-size: 15px; line-height: 1.5; color: #424245; margin-bottom: 24px;">
+          Hola, ${user.name}<br><br>
+          Recibimos una solicitud para restablecer la contraseña de tu cuenta en el portal de <strong>Atalayas EGM</strong>. Si no realizaste esta solicitud, puedes ignorar este mensaje de forma segura.
+        </p>
+
+        <div style="text-align: center; margin: 35px 0;">
+          <a href="http://localhost:5173/reset-password?token=${resetToken}" 
+             style="background-color: #0071e3; color: #ffffff; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-size: 15px; font-weight: 500; display: inline-block; transition: background-color 0.2s;">
+            Establecer nueva contraseña
+          </a>
+        </div>
+
+        <p style="font-size: 13px; line-height: 1.4; color: #86868b; margin-top: 30px; text-align: center;">
+          Este enlace expirará en 60 minutos por motivos de seguridad.
+        </p>
+
+        <div style="height: 1px; background-color: #d2d2d7; margin-top: 30px; margin-bottom: 20px;"></div>
+
+        <p style="font-size: 12px; color: #86868b; text-align: center; margin: 0;">
+          &copy; ${new Date().getFullYear()} Atalayas EGM. Todos los derechos reservados.
+        </p>
+      </div>
+    </div>
+  `,
+      });
+      console.log('Correo enviado a Mailtrap con éxito');
+    } catch (error) {
+      console.error('Error enviando el correo:', error);
+    }
+
+    return { message: 'Proceso iniciado' };
   }
 
   async resetPassword(token: string, newPassword: string) {

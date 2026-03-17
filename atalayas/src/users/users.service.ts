@@ -30,13 +30,7 @@ export class UsersService {
     let finalRole: Role;
 
     if (requestUser.role === 'GENERAL_ADMIN') {
-      // El General Admin DEBE proporcionar una empresa a la que asignar el usuario
-      if (!createUserDto.companyId) {
-        throw new ForbiddenException(
-          'Un GENERAL_ADMIN debe especificar el companyId al crear un usuario',
-        );
-      }
-      finalCompanyId = createUserDto.companyId;
+      finalCompanyId = createUserDto.companyId || null;
       finalRole = (createUserDto.role as Role) || Role.EMPLOYEE;
     } else {
       if (requestUser.role === 'ADMIN' && !requestUser.companyId) {
