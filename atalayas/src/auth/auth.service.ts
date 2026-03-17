@@ -1,9 +1,9 @@
-import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
-import { emitWarning } from 'process';
 import { Role } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
@@ -130,5 +130,34 @@ async handleOAuthLogin(token: string) {
       },
       token: token,
     };
+  }
+
+  async requestPasswordReset(email: string) {
+    const user = await this.prismaService.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const resetToken = uuidv4();
+    const resetTokenExp = new Date();
+    resetTokenExp.setHours(resetTokenExp.getHours() + 1); // El token expira en 1 hora
+
+    await this.prismaService.user.update({
+      where: { email },
+      data: { resetToken:resetToken, resetTokenExp: resetTokenExp },
+    });
+    return { message: 'Si el correo existe, recibirás instrucciones para restablecer tu contraseña.' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.prismaService.user.findFirst({ where: { resetToken: token, resetTokenExp: { gt: new Date() } } });
+    if (!user) throw new NotFoundException('Token inválido');
+    const { error } = await this.supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
+    if (error) throw new BadRequestException(error.message);
+    await this.prismaService.user.update({
+      where: { id: user.id },
+      data: { resetToken: null, resetTokenExp: null },
+    });
+    return { message: 'Contraseña restablecida exitosamente' };
 }
 }
+      
+   

@@ -515,6 +515,8 @@ model User {
   id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId      String?        @db.Uuid
   avatarUrl      String?
+  resetToken     String?        @unique
+  resetTokenExp  DateTime?
   Document       Document[]
   Enrollment     Enrollment[]
   Company        Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
