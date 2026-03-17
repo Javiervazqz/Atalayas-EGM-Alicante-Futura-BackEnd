@@ -20,10 +20,10 @@ export class CreateUserDto {
   @ApiPropertyOptional({
     example: 'EMPLOYEE',
     description: 'Rol del usuario (EMPLOYEE o ADMIN). Por defecto es EMPLOYEE.',
-    enum:[Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN],
+    enum:[Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN, Role.PUBLIC],
     required: false
   })
-  @IsEnum([Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN])
+  @IsEnum([Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN, Role.PUBLIC])
   @IsOptional()
   role?: Role;
 }
