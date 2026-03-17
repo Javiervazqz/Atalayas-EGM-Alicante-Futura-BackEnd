@@ -9,20 +9,20 @@ import { GoogleOAuthDto } from './dto/google-oauth.dto';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-  
-    @Post('login')
-    async login(@Body() body: LoginDto) {
-        return this.authService.login(body.email, body.password);
-    }
 
-    @Post('register')
-    async register(@Body() body: RegisterDto) {
-        return this.authService.registerPublicUser(body);
-    }
+  @Post('login')
+  async login(@Body() body: LoginDto) {
+    return this.authService.login(body.email, body.password);
+  }
 
-    @Post('oauth/google')
-    async googleOAuth(@Body() body: GoogleOAuthDto){
-        // Implementation for Google OAuth
-        return this.authService.handleOAuthLogin(body.token);
-    }
+  @Post('register')
+  async register(@Body() body: RegisterDto) {
+    return this.authService.registerPublicUser(body);
+  }
+
+  @Post('oauth/google')
+  async googleOAuth(@Body() body: GoogleOAuthDto) {
+    // Implementation for Google OAuth
+    return this.authService.handleOAuthLogin(body.token);
+  }
 }
