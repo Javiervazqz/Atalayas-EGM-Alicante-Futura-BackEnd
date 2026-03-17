@@ -18,7 +18,7 @@ async function bootstrap() {
   // 2. Configuración de CORS para el frontend
   app.enableCors({
     origin: 'http://localhost:5173',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
 
@@ -35,6 +35,6 @@ async function bootstrap() {
   // Montamos Swagger en la ruta '/swagger'
   SwaggerModule.setup('swagger', app, document);
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(3000);
 }
-bootstrap();
+void bootstrap();
