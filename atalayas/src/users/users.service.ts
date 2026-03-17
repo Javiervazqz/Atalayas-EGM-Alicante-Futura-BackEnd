@@ -39,12 +39,16 @@ export class UsersService {
       finalCompanyId = createUserDto.companyId;
       finalRole = (createUserDto.role as Role) || Role.EMPLOYEE;
     } else {
-      if(requestUser.role === 'ADMIN' && !requestUser.companyId) {
-        throw new ForbiddenException('Tu usuario no tiene una empresa asignada.');
+      if (requestUser.role === 'ADMIN' && !requestUser.companyId) {
+        throw new ForbiddenException(
+          'Tu usuario no tiene una empresa asignada.',
+        );
       }
       finalCompanyId = requestUser.companyId;
-      if(createUserDto.role === 'GENERAL_ADMIN'){
-        throw new ForbiddenException('No puedes crear un usuario con rol GENERAL_ADMIN');
+      if (createUserDto.role === 'GENERAL_ADMIN') {
+        throw new ForbiddenException(
+          'No puedes crear un usuario con rol GENERAL_ADMIN',
+        );
       }
       finalRole = (createUserDto.role as Role) || Role.EMPLOYEE;
     }
@@ -110,7 +114,7 @@ export class UsersService {
     const user = await this.prismaService.user.findUnique({
       where: {
         id,
-       },
+      },
       include: { Company: true },
     });
 
@@ -120,9 +124,12 @@ export class UsersService {
       );
     }
 
-    if (requestUser.role === 'ADMIN' && user.companyId !== requestUser.companyId) {
-    throw new ForbiddenException('Este usuario pertenece a otra empresa.');
-  }
+    if (
+      requestUser.role === 'ADMIN' &&
+      user.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException('Este usuario pertenece a otra empresa.');
+    }
 
     return user;
   }
