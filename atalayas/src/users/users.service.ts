@@ -2,15 +2,12 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
-// Importamos Role (el Enum de Prisma) y User
 import { User, Role } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
-import { request } from 'node:http';
 
 @Injectable()
 export class UsersService {
@@ -20,20 +17,28 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto, requestUser: User) {
-    // 1. Empleados fuera
+    console.log('--- NUEVA CREACIÓN ---');
+    console.log('Rol recibido del front:', createUserDto.role);
+
+    // 1. Validación de permisos
     if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear usuarios');
     }
 
-    // 2. Multitenancy estricto: ¿A qué empresa va este nuevo usuario?
+    // 2. Lógica de Multitenancy y Roles
     let finalCompanyId: string | null;
     let finalRole: Role;
 
     if (requestUser.role === 'GENERAL_ADMIN') {
-      finalCompanyId = createUserDto.companyId || null;
+      if (!createUserDto.companyId) {
+        throw new ForbiddenException(
+          'Un GENERAL_ADMIN debe especificar el companyId',
+        );
+      }
+      finalCompanyId = createUserDto.companyId;
       finalRole = (createUserDto.role as Role) || Role.EMPLOYEE;
     } else {
-      if (requestUser.role === 'ADMIN' && !requestUser.companyId) {
+      if (!requestUser.companyId) {
         throw new ForbiddenException(
           'Tu usuario no tiene una empresa asignada.',
         );
@@ -47,36 +52,23 @@ export class UsersService {
       finalRole = (createUserDto.role as Role) || Role.EMPLOYEE;
     }
 
+    // 3. Generación de contraseña temporal
     const password = Math.random().toString(36).slice(-8);
 
-    const authUser = await this.authService.register(
-      createUserDto.email,
-      password,
-    );
-
-    try {
-      const newUser = await this.prismaService.user.create({
-        data: {
-          id: authUser.id,
-          email: createUserDto.email,
-          name: createUserDto.name,
-          companyId: finalCompanyId,
-          role: finalRole,
-        },
-      });
-
-      return {
-        ...newUser,
-        provisionalPassword: password,
-      };
-    } catch {
-      if (authUser?.id) {
-        await this.authService.deleteUser(authUser.id);
-      }
-      throw new InternalServerErrorException(
-        'Error al crear el usuario en la base de datos',
-      );
-    }
+    // 4. LLAMADA CORREGIDA AL AUTH SERVICE (Error TS2554 arreglado)
+    // Pasamos UN SOLO OBJETO que contenga todo lo que el RegisterDto espera
+    const authUser = await this.authService.register({
+      email: createUserDto.email,
+      password: password,
+      name: createUserDto.name,
+      role: finalRole,
+      companyId: finalCompanyId,
+    });
+    // Retornamos la password provisional SOLO UNA VEZ para que el admin la vea
+    return {
+      ...authUser,
+      provisionalPassword: password,
+    };
   }
 
   async findAll(requestUser: User) {
@@ -88,9 +80,7 @@ export class UsersService {
 
     if (requestUser.role === 'ADMIN') {
       return await this.prismaService.user.findMany({
-        where: {
-          companyId: requestUser.companyId,
-        },
+        where: { companyId: requestUser.companyId },
         include: { Company: true },
       });
     }
@@ -99,25 +89,14 @@ export class UsersService {
   }
 
   async findOne(id: string, requestUser: User) {
-    if (requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException(
-        'Los empleados no pueden buscar otros usuarios',
-      );
-    }
-
     const user = await this.prismaService.user.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
       include: { Company: true },
     });
 
-    if (!user) {
-      throw new NotFoundException(
-        `Usuario con ID ${id} no encontrado o no tienes permisos para verlo`,
-      );
-    }
+    if (!user) throw new NotFoundException(`Usuario no encontrado`);
 
+    // Validación de empresa para el Admin normal
     if (
       requestUser.role === 'ADMIN' &&
       user.companyId !== requestUser.companyId
@@ -129,15 +108,11 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto, requestUser: User) {
-    // findOne ya hace las validaciones de si existe, si soy empleado y si es de mi empresa
     await this.findOne(id, requestUser);
-
-    // Creamos una copia de los datos para poder manipularlos sin errores de tipado
     const updateData = { ...updateUserDto };
 
-    // Evitamos que un Admin normal se cambie de empresa haciendo trampas en el update
     if (requestUser.role !== 'GENERAL_ADMIN' && updateData.companyId) {
-      delete updateData.companyId; // Borramos el intento de hackeo silenciosamente
+      delete updateData.companyId;
     }
 
     return this.prismaService.user.update({
@@ -150,17 +125,11 @@ export class UsersService {
   async remove(id: string, requestUser: User) {
     await this.findOne(id, requestUser);
 
-    // No permitimos que un Admin se borre a sí mismo por error
     if (id === requestUser.id) {
-      throw new ForbiddenException(
-        'No puedes eliminar tu propio usuario administrador',
-      );
+      throw new ForbiddenException('No puedes eliminarte a ti mismo');
     }
 
-    await this.prismaService.user.delete({
-      where: { id },
-    });
-
+    await this.prismaService.user.delete({ where: { id } });
     await this.authService.deleteUser(id);
 
     return { message: 'Usuario eliminado correctamente' };
