@@ -1,4 +1,12 @@
-import { IsEmail, IsOptional, IsString, IsUUID, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsEnum,
+  IsNotEmpty,
+  MinLength,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Transform } from 'class-transformer';
@@ -11,19 +19,25 @@ export class CreateUserDto {
   @IsString()
   name: string;
 
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(4, { message: 'La contraseña debe tener al menos 4 caracteres' })
+  password: string;
+
   @ApiProperty({ required: false, example: '' })
   @IsUUID()
   @IsOptional()
-  @Transform(({ value }) => value || undefined)
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  @Transform(({ value }) => value || null)
   companyId?: string;
 
   @ApiPropertyOptional({
     example: 'EMPLOYEE',
     description: 'Rol del usuario (EMPLOYEE o ADMIN). Por defecto es EMPLOYEE.',
-    enum:[Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN],
-    required: false
+    enum: [Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN, Role.PUBLIC],
+    required: false,
   })
-  @IsEnum([Role.EMPLOYEE, Role.ADMIN, Role.GENERAL_ADMIN])
+  @IsEnum(Role)
   @IsOptional()
   role?: Role;
 }
