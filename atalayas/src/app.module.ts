@@ -10,6 +10,8 @@ import { EnrollmentModule } from './enrollment/enrollment.module';
 import { StorageModule } from './storage/storage.module';
 import { ContentModule } from './content/content.module';
 import { ServicesModule } from './services/services.module';
+import {MailerModule} from '@nestjs-modules/mailer';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -23,6 +25,19 @@ import { ServicesModule } from './services/services.module';
     StorageModule,
     ContentModule,
     ServicesModule,
+    MailerModule.forRoot({
+      transport: {
+  host: "sandbox.smtp.mailtrap.io",
+  port: 2525,
+  auth: {
+    user: "551f1f8284f530",
+    pass: "b194cce3ad7aa3"
+  },
+},
+      defaults: {
+        from: '"Atalayas" <noreply@atalayas.com>'
+      },
+}),
   ],
   controllers: [],
   providers: [],

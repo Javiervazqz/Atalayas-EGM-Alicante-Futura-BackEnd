@@ -21,9 +21,19 @@ export class AuthController {
     // Este es para el registro público (el que se asigna Role.PUBLIC)
     return this.authService.registerPublicUser(body);
   }
-
+  
   @Post('oauth/google')
-  async googleOAuth(@Body() body: GoogleOAuthDto) {
-    return this.authService.handleOAuthLogin(body.token);
+  async googleOAuth(@Body() body: GoogleOAuthDto){
+      return this.authService.handleOAuthLogin(body.token);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body('email')  email: string ) {
+      return this.authService.requestPasswordReset(email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body('token')  token: string, @Body('newPassword') newPassword: string ) {
+      return this.authService.resetPassword(token, newPassword);
   }
 }
