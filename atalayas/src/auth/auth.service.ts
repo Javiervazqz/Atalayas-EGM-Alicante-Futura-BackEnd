@@ -56,8 +56,8 @@ export class AuthService {
         id: data.user.id,
         email: data.user.email,
         role: publicUser.role,
-        name: publicUser.name, // 👈 Añade el nombre
-        companyId: publicUser.companyId, // 👈 ¡ESTO ES CRUCIAL!
+        name: publicUser.name,
+        companyId: publicUser.companyId,
       },
     };
   }
@@ -91,7 +91,7 @@ export class AuthService {
         },
       });
     } catch (err) {
-      // Si falla Prisma, borramos el de Supabase para no romper la integridad
+      // Si falla Prisma, borramos el de Supabase
       await this.supabaseAdmin.auth.admin.deleteUser(data.user.id);
       console.error('Error Prisma:', err);
       throw new InternalServerErrorException('Error al sincronizar con Prisma');
@@ -110,7 +110,7 @@ export class AuthService {
         data: {
           id: data.user!.id,
           email: registerDto.email,
-          name: registerDto.email.split('@')[0], // Asignamos el nombre por defecto como la parte antes del @ del email
+          name: registerDto.email.split('@')[0], // Asigna el nombre por defecto como la parte antes del @ del email
           role: Role.PUBLIC,
           companyId: null,
         },
@@ -186,7 +186,7 @@ export class AuthService {
       await this.mailerService.sendMail({
         to: email,
         subject: 'Recuperar contraseña - Atalayas',
-        text: 'Haz clic aquí para resetear', // Siempre añade un 'text' por si acaso
+        text: 'Haz clic aquí para resetear',
         html: `<div style="background-color: #f5f5f7; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
       <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 24px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
         

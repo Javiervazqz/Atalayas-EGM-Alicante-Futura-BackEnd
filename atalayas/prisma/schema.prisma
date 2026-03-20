@@ -567,6 +567,23 @@ model Service {
   @@schema("public")
 }
 
+model CompanyRequest {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyName  String
+  cif          String     @unique
+  contactName  String
+  contactEmail String
+  phone        String?
+  address      String?
+  activity     String?
+  documentUrl  String?
+  status       statusType @default(PENDING)
+  rejectReason String?
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+
+  @@schema("public")
+}
+
 enum aal_level {
   aal1
   aal2
@@ -659,6 +676,14 @@ enum serviceType {
   INFO
   BOOKING
   ANNOUNCEMENT
+
+  @@schema("public")
+}
+
+enum statusType {
+  PENDING
+  APPROVED
+  REJECTED
 
   @@schema("public")
 }

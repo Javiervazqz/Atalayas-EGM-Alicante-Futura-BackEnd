@@ -11,6 +11,7 @@ import { StorageModule } from './storage/storage.module';
 import { ContentModule } from './content/content.module';
 import { ServicesModule } from './services/services.module';
 import {MailerModule} from '@nestjs-modules/mailer';
+import { CompanyRequestModule } from './company-request/company-request.module';
 
 @Module({
   imports: [
@@ -30,14 +31,15 @@ import {MailerModule} from '@nestjs-modules/mailer';
   host: "sandbox.smtp.mailtrap.io",
   port: 2525,
   auth: {
-    user: "551f1f8284f530",
-    pass: "b194cce3ad7aa3"
+    user: process.env.MAILTRAP_USER,
+    pass: process.env.MAILTRAP_PASS,
   },
 },
       defaults: {
         from: '"Atalayas" <noreply@atalayas.com>'
       },
 }),
+    CompanyRequestModule,
   ],
   controllers: [],
   providers: [],
