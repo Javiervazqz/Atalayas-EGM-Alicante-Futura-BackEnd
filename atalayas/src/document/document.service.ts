@@ -77,15 +77,44 @@ export class DocumentService {
   }
 
   async findAll(requestUser: User) {
+    // 1. SÚPER ADMIN: Ve absolutamente todo (Globales y de todas las empresas)
     if (requestUser.role === 'GENERAL_ADMIN') {
       return this.prisma.document.findMany({
         include: { Company: true, User: true },
+        orderBy: { createdAt: 'desc' },
       });
     }
 
+    // 2. ADMIN DE EMPRESA: Ve Globales + TODOS los de su empresa (Públicos, Privados y Contratos de otros)
+    if (requestUser.role === 'ADMIN') {
+      return this.prisma.document.findMany({
+        where: {
+          OR: [
+            { isPublic: true, companyId: null }, // Globales del sistema
+            { companyId: requestUser.companyId }, // Toda la caja fuerte de su empresa
+          ],
+        },
+        include: { Company: true, User: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    // 3. EMPLEADOS: Seguridad estricta
     return this.prisma.document.findMany({
-      where: { companyId: requestUser.companyId },
+      where: {
+        OR: [
+          // Nivel 1: Globales del sistema (Manuales de la plataforma)
+          { isPublic: true, companyId: null },
+
+          // Nivel 2: Tablón de anuncios de SU empresa (Calendarios, normativas)
+          { isPublic: true, companyId: requestUser.companyId },
+
+          // Nivel 4: SOLO SUS documentos personales (Nóminas, contratos propios)
+          { companyId: requestUser.companyId, userId: requestUser.id },
+        ],
+      },
       include: { Company: true, User: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
