@@ -7,7 +7,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
-import { format } from 'path';
+import { Query } from '@nestjs/common';
 
 @ApiTags('company-request')
 @Controller('company-request')
@@ -59,8 +59,8 @@ export class CompanyRequestController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('GENERAL_ADMIN')
-  async findAll() {
-    return this.companyRequestService.findAll();
+  async findAll(@Query('archived') archived?: string) {
+    return this.companyRequestService.findAll(archived === 'true');
   }
 
   @Get(':id')
@@ -93,6 +93,22 @@ export class CompanyRequestController {
   })
   async reject(@Param('id', ParseUUIDPipe) id: string, @Body() body: {rejectReason: string}){
     return this.companyRequestService.reject(id, body.rejectReason)
+  }
+
+  @Patch(':id/archive')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('GENERAL_ADMIN')
+  async archive(@Param('id', ParseUUIDPipe) id: string) {
+    return this.companyRequestService.archive(id);
+  }
+
+  @Patch(':id/unarchive')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('GENERAL_ADMIN')
+  async unarchive(@Param('id', ParseUUIDPipe) id: string) {
+    return this.companyRequestService.unarchive(id);
   }
 
   @Delete(':id')

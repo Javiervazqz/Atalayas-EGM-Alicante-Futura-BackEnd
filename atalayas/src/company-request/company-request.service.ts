@@ -48,10 +48,13 @@ export class CompanyRequestService {
     });
   }
 
-  async findAll() {
-    return this.prismaService.companyRequest.findMany({
+  async findAll(showArchived = false) {
+    const request = this.prismaService.companyRequest.findMany({
+      where: {archivedAt: showArchived? {not:null}: null},
       orderBy: {created_at: 'desc'}
     });
+    console.log('Primera solicitud:', JSON.stringify(request, null, 2));
+    return request;
   }
 
   async findOne(id: string) {
@@ -159,5 +162,27 @@ export class CompanyRequestService {
       where: {id}
     })
     return `Solicitud borrada con éxito`;
+  }
+
+  async archive(id:string){
+    const request = await this.findOne(id);
+
+    if(request.status === 'PENDING') {
+      throw new BadRequestException('No puedes archivar una solicitud pendiente')
+    }
+
+    return this.prismaService.companyRequest.update({
+      where: {id},
+      data: {archivedAt:new Date()}
+    });
+  }
+
+  async unarchive(id:string){
+    await this.findOne(id);
+
+    return this.prismaService.companyRequest.update({
+      where: {id},
+      data: {archivedAt: null}
+    });
   }
 }
