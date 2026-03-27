@@ -71,7 +71,7 @@ export class ServicesService {
       throw new ForbiddenException('No tienes permisos para ver este servicio');
     }
     if (
-      requestUser.role === 'GENERAL_ADMIN' &&
+      requestUser.role !== 'GENERAL_ADMIN' &&
       !service.isPublic &&
       service.companyId !== requestUser.companyId
     ) {
