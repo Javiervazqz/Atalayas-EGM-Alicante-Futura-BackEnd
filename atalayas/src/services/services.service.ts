@@ -31,9 +31,15 @@ export class ServicesService {
         title: createServiceDto.title,
         description: createServiceDto.description,
         mediaUrl: createServiceDto.mediaUrl,
-        serviceType: createServiceDto.type,
         isPublic: createServiceDto.isPublic ?? false,
         companyId,
+        providerName: createServiceDto.providerName,
+        email: createServiceDto.email,
+        phone: createServiceDto.phone,
+        address: createServiceDto.address,
+        schedule: createServiceDto.schedule,
+        externalUrl: createServiceDto.externalUrl,
+        price: createServiceDto.price,
       },
     });
   }
@@ -108,8 +114,14 @@ export class ServicesService {
         title: updateServiceDto.title,
         description: updateServiceDto.description,
         mediaUrl: updateServiceDto.mediaUrl,
-        serviceType: updateServiceDto.type,
         isPublic: updateServiceDto.isPublic,
+        providerName: updateServiceDto.providerName,
+        email: updateServiceDto.email,
+        phone: updateServiceDto.phone,
+        address: updateServiceDto.address,
+        schedule: updateServiceDto.schedule,
+        externalUrl: updateServiceDto.externalUrl,
+        price: updateServiceDto.price,
       },
     });
   }
