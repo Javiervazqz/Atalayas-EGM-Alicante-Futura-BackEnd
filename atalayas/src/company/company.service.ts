@@ -3,14 +3,18 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { CreateCompanyDto } from './dto/create-company.dto.js'; // Recuerda el .js
-import { UpdateCompanyDto } from './dto/update-company.dto.js'; // Recuerda el .js
+import { CreateCompanyDto } from './dto/create-company.dto.js';
+import { UpdateCompanyDto } from './dto/update-company.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { StorageService } from '../storage/storage.service.js'; // 👈 1. Importamos StorageService
 import { User } from '@prisma/client';
 
 @Injectable()
 export class CompanyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService, // 👈 2. Lo inyectamos en el constructor
+  ) {}
 
   async create(createCompanyDto: CreateCompanyDto, requestUser: User) {
     // 🔒 SEGURIDAD: Solo un súper admin puede dar de alta nuevas empresas
@@ -56,10 +60,12 @@ export class CompanyService {
     return company;
   }
 
+  // 👇 3. Añadimos el parámetro "file" al método update
   async update(
     id: string,
     updateCompanyDto: UpdateCompanyDto,
     requestUser: User,
+    file?: Express.Multer.File,
   ) {
     // 1. Comprobamos que la empresa existe primero
     const company = await this.prisma.company.findUnique({
@@ -70,7 +76,7 @@ export class CompanyService {
       throw new NotFoundException(`Empresa con ID ${id} no encontrada`);
     }
 
-    // 2. 🔒 SEGURIDAD ESTRICTA DE ROLES:
+    // 2. 🔒 SEGURIDAD ESTRICTA DE ROLES (Tu lógica impecable):
     const isGeneralAdmin = requestUser.role === 'GENERAL_ADMIN';
     const isAdminOfThisCompany =
       requestUser.role === 'ADMIN' && requestUser.companyId === id;
@@ -82,10 +88,38 @@ export class CompanyService {
       );
     }
 
-    // 3. Si pasa la seguridad, actualizamos
+    // 3. Preparamos los datos a guardar
+    const dataToUpdate: {
+      name?: string;
+      address?: string;
+      description?: string;
+      website?: string;
+      contactEmail?: string;
+      contactPhone?: string;
+      cif?: string;
+      activity?: string;
+      logoUrl?: string;
+    } = { ...updateCompanyDto };
+
+    // 4. Gestión del Logo (Avatar de la empresa)
+    if (file) {
+      const newLogoUrl = await this.storageService.uploadFile(file);
+      dataToUpdate.logoUrl = newLogoUrl;
+
+      // Borramos el logo antiguo si existía
+      if (company.logoUrl) {
+        try {
+          await this.storageService.deleteFile(company.logoUrl);
+        } catch (error) {
+          console.error('Error borrando logo antiguo de la empresa:', error);
+        }
+      }
+    }
+
+    // 5. Si pasa la seguridad y procesamos todo, actualizamos
     return this.prisma.company.update({
       where: { id },
-      data: updateCompanyDto,
+      data: dataToUpdate,
     });
   }
 
