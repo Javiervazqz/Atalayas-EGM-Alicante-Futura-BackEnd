@@ -9,7 +9,7 @@ export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 const MAX_PDF_CHARS = 6_000; // ~1500 tokens por PDF
 const MAX_PDFS = 5; // Máximo PDFs a extraer por petición
 
-const pdfParse = require('pdf-parse');
+/*const pdfParse = require('pdf-parse');*/
 
 @Injectable()
 export class ChatBotService {
@@ -127,6 +127,8 @@ export class ChatBotService {
   private async extractPdfTexts(
     documents: any[],
   ): Promise<Array<{ title: string; text: string }>> {
+    const pdfReader = require('pdf-parse-fork');
+
     const pdfs = documents.filter((d) =>
       d.fileUrl?.toLowerCase().endsWith('.pdf'),
     );
@@ -137,20 +139,36 @@ export class ChatBotService {
           const res = await fetch(doc.fileUrl);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-          const buffer = Buffer.from(await res.arrayBuffer());
-          const parsed = await pdfParse(buffer);
+          // Convertimos a Buffer de Node.js
+          const arrayBuffer = await res.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
 
-          const text = parsed.text
+          const parse =
+            typeof pdfReader === 'function' ? pdfReader : pdfReader.default;
+
+          if (typeof parse !== 'function') {
+            throw new Error(
+              'No se pudo encontrar la función de parseo en la librería',
+            );
+          }
+
+          // Con pdf-parse-fork la llamada es directa y estable
+          const data = await parse(buffer);
+          this.logger.log(`PDF "${doc.title}": ${data.text.slice(0, 100)}...`);
+
+          const text = data.text
             .replace(/\s+/g, ' ')
             .trim()
             .slice(0, MAX_PDF_CHARS);
 
           return { title: doc.title, text };
         } catch (err) {
-          this.logger.warn(`PDF no legible "${doc.title}": ${err.message}`);
+          this.logger.warn(
+            `Error procesando PDF "${doc.title}": ${err.message}`,
+          );
           return {
             title: doc.title,
-            text: '[Contenido no disponible — contacta con tu administrador]',
+            text: '[Contenido no extraíble]',
           };
         }
       }),
