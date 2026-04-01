@@ -37,8 +37,10 @@
     "jwks-rsa": "^4.0.1",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.2",
+    "openai": "^6.33.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdf-parse-fork": "^1.2.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -57,6 +59,7 @@
     "@types/node": "^22.10.7",
     "@types/nodemailer": "^7.0.11",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.18.0",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.18.0",
@@ -92,7 +95,7 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {
-    "^src/(.*)$": "<rootDir>/$1"
-  }
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }
