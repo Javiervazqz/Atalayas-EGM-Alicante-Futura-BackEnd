@@ -572,6 +572,13 @@ model Service {
   title           String
   description     String?
   isPublic        Boolean           @default(false)
+  providerName    String?
+  email           String?
+  address         String?
+  schedule        String?
+  externalUrl     String?
+  price           String?
+  phone           String?
   Company         Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   ServiceSchedule ServiceSchedule[]
 
@@ -729,14 +736,6 @@ enum contentType {
   VIDEO
   PODCAST
   TEST
-
-  @@schema("public")
-}
-
-enum serviceType {
-  INFO
-  BOOKING
-  ANNOUNCEMENT
 
   @@schema("public")
 }
