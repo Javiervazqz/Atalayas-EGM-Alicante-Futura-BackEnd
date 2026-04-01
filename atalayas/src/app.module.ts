@@ -12,7 +12,7 @@ import { ContentModule } from './content/content.module';
 import { ServicesModule } from './services/services.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { CompanyRequestModule } from './company-request/company-request.module';
-import { ChatBotModule } from './chatbot/chatbot.module';
+import { ChatBotModule } from './ai/chatbot/chatbot.module';
 
 @Module({
   imports: [

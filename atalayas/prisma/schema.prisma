@@ -483,6 +483,8 @@ model Course {
   id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId  String?      @db.Uuid
   isPublic   Boolean      @default(false)
+  category   String?      @default("'BASICO'")
+  fileUrl    String?
   Content    Content[]
   Company    Company?     @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Enrollment Enrollment[]
@@ -543,6 +545,9 @@ model Content {
   order          Int            @db.SmallInt
   courseId       String         @db.Uuid
   url            String?
+  summary        String?
+  quiz           Json?
+  podcast        Json?
   Course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   userProgresses UserProgress[]
 
@@ -564,22 +569,21 @@ model UserProgress {
 }
 
 model Service {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId       String?           @db.Uuid
-  created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  mediaUrl        String?
-  title           String
-  description     String?
-  isPublic        Boolean           @default(false)
-  providerName    String?
-  email           String?
-  address         String?
-  schedule        String?
-  externalUrl     String?
-  price           String?
-  phone           String?
-  Company         Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ServiceSchedule ServiceSchedule[]
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String?  @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  mediaUrl     String?
+  title        String
+  description  String?
+  isPublic     Boolean  @default(false)
+  providerName String?
+  email        String?
+  address      String?
+  schedule     String?
+  externalUrl  String?
+  price        String?
+  phone        String?
+  Company      Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }
@@ -636,19 +640,6 @@ model webauthn_credentials {
 
   @@index([user_id])
   @@schema("auth")
-}
-
-model ServiceSchedule {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  serviceId   String?   @db.Uuid
-  dayOfWeek   dayOfWeek
-  startTime   DateTime  @db.Time(6)
-  endTime     DateTime  @db.Time(6)
-  maxCapacity Int?      @default(1) @db.SmallInt
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
-  Service     Service?  @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@schema("public")
 }
 
 enum aal_level {

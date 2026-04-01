@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import OpenAI from 'openai';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -8,8 +8,6 @@ export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 // ── Límites para no explotar el contexto ─────────────────────────────────────
 const MAX_PDF_CHARS = 6_000; // ~1500 tokens por PDF
 const MAX_PDFS = 5; // Máximo PDFs a extraer por petición
-
-/*const pdfParse = require('pdf-parse');*/
 
 @Injectable()
 export class ChatBotService {
