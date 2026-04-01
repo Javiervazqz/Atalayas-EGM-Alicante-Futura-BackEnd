@@ -1,17 +1,29 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { Role } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { MailerService } from '@nestjs-modules/mailer';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class AuthService {
   private supabase: ReturnType<typeof createClient>;
   private supabaseAdmin: ReturnType<typeof createClient>;
 
-  constructor(private readonly prismaService: PrismaService, private readonly mailerService: MailerService) {
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly mailerService: MailerService,
+    private readonly storageService: StorageService,
+  ) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -58,6 +70,7 @@ export class AuthService {
         role: publicUser.role,
         name: publicUser.name,
         companyId: publicUser.companyId,
+        avatarUrl: publicUser.avatarUrl,
       },
     };
   }
@@ -175,13 +188,13 @@ export class AuthService {
     const resetTokenExp = new Date();
     resetTokenExp.setHours(resetTokenExp.getHours() + 1); // El token expira en 1 hora
 
-    console.log(resetToken)
+    console.log(resetToken);
 
     await this.prismaService.user.update({
       where: { email },
       data: { resetToken, resetTokenExp },
     });
-    
+
     try {
       await this.mailerService.sendMail({
         to: email,
@@ -232,16 +245,78 @@ export class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string) {
-    const user = await this.prismaService.user.findFirst({ where: { resetToken: token, resetTokenExp: { gt: new Date() } } });
+    const user = await this.prismaService.user.findFirst({
+      where: { resetToken: token, resetTokenExp: { gt: new Date() } },
+    });
     if (!user) throw new NotFoundException('Token inválido');
-    const { error } = await this.supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
+    const { error } = await this.supabaseAdmin.auth.admin.updateUserById(
+      user.id,
+      { password: newPassword },
+    );
     if (error) throw new BadRequestException(error.message);
     await this.prismaService.user.update({
       where: { id: user.id },
       data: { resetToken: null, resetTokenExp: null },
     });
     return { message: 'Contraseña restablecida exitosamente' };
+  }
+
+  async updateProfile(
+    userId: string,
+    updateProfileDto: UpdateProfileDto,
+    file?: Express.Multer.File,
+  ) {
+    // 1. Buscamos el usuario en Prisma
+    const currentUser = await this.prismaService.user.findUnique({
+      where: { id: userId },
+    });
+    if (!currentUser) throw new BadRequestException('Usuario no encontrado');
+
+    // 2. Gestión de la Contraseña (¡Con Supabase, no con Prisma!)
+    if (updateProfileDto.password) {
+      const { error } = await this.supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { password: updateProfileDto.password },
+      );
+      if (error)
+        throw new BadRequestException(
+          'Error al cambiar la contraseña: ' + error.message,
+        );
+    }
+
+    // 3. Preparamos los datos públicos para actualizar en Prisma
+    const dataToUpdate: { name?: string; avatarUrl?: string } = {};
+
+    // 3a. Nombre
+    if (updateProfileDto.name) {
+      dataToUpdate.name = updateProfileDto.name;
+    }
+
+    // 3b. Avatar
+    if (file) {
+      const newAvatarUrl = await this.storageService.uploadFile(file);
+      dataToUpdate.avatarUrl = newAvatarUrl;
+
+      // Borramos el avatar antiguo de Supabase Storage para limpiar
+      if (currentUser.avatarUrl) {
+        try {
+          await this.storageService.deleteFile(currentUser.avatarUrl);
+        } catch (error) {
+          console.error('Error borrando avatar antiguo:', error);
+        }
+      }
+    }
+
+    // 4. Actualización final en Prisma (Solo si hay cambios de nombre o avatar)
+    if (Object.keys(dataToUpdate).length > 0) {
+      const updatedUser = await this.prismaService.user.update({
+        where: { id: userId },
+        data: dataToUpdate,
+      });
+      return updatedUser;
+    }
+
+    // Si solo cambió la contraseña, devolvemos el usuario tal cual lo teníamos
+    return currentUser;
+  }
 }
-}
-      
-   
