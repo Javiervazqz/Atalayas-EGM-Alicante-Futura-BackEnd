@@ -18,21 +18,26 @@ export class CoursesService {
       throw new ForbiddenException('No tienes permisos para crear cursos');
     }
 
-    const companyId = requestUser.role === 'GENERAL_ADMIN' && createCourseDto.companyId
-      ? createCourseDto.companyId
-      : requestUser.companyId;
+    const companyId =
+      requestUser.role === 'GENERAL_ADMIN' && createCourseDto.companyId
+        ? createCourseDto.companyId
+        : requestUser.companyId;
 
-      if(!companyId) {
-        throw new ForbiddenException('No puedes asignar un curso a una empresa sin especificar un ID de empresa válido');
-      }
+    if (!companyId) {
+      throw new ForbiddenException(
+        'No puedes asignar un curso a una empresa sin especificar un ID de empresa válido',
+      );
+    }
 
-      if(requestUser.role === 'GENERAL_ADMIN') {
-        createCourseDto.isPublic = createCourseDto.isPublic || false; // Si no se especifica, por defecto no es público
-      }
+    if (requestUser.role === 'GENERAL_ADMIN') {
+      createCourseDto.isPublic = createCourseDto.isPublic || false; // Si no se especifica, por defecto no es público
+    }
 
-      if(requestUser.role !== 'GENERAL_ADMIN' && createCourseDto.isPublic) {
-        throw new ForbiddenException('Solo los administradores generales pueden crear cursos públicos');
-      }
+    if (requestUser.role !== 'GENERAL_ADMIN' && createCourseDto.isPublic) {
+      throw new ForbiddenException(
+        'Solo los administradores generales pueden crear cursos públicos',
+      );
+    }
 
     // 2. Forzamos el ID de la empresa del usuario creador
     return await this.prismaService.course.create({
@@ -40,6 +45,8 @@ export class CoursesService {
         title: createCourseDto.title,
         companyId,
         isPublic: createCourseDto.isPublic,
+        category: createCourseDto.category || 'BASICO',
+        fileUrl: createCourseDto.fileUrl || null,
       },
     });
   }
@@ -49,19 +56,16 @@ export class CoursesService {
     if (requestUser.role === 'GENERAL_ADMIN') {
       return await this.prismaService.course.findMany();
     }
-    if(requestUser.role === 'PUBLIC') {
+    if (requestUser.role === 'PUBLIC') {
       return await this.prismaService.course.findMany({
         where: {
-          isPublic: true
+          isPublic: true,
         },
       });
     }
     return await this.prismaService.course.findMany({
       where: {
-        OR: [
-          { companyId: requestUser.companyId },
-          { isPublic: true }
-        ]
+        OR: [{ companyId: requestUser.companyId }, { isPublic: true }],
       },
     });
   }
@@ -78,7 +82,10 @@ export class CoursesService {
     }
 
     // 2. Seguridad: ¿Tiene permiso para ver este curso específico?
-    if (requestUser.role !== 'GENERAL_ADMIN' && course.companyId !== requestUser.companyId) {
+    if (
+      requestUser.role !== 'GENERAL_ADMIN' &&
+      course.companyId !== requestUser.companyId
+    ) {
       throw new ForbiddenException('No tienes permisos para ver este curso');
     }
 
