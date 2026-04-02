@@ -9,8 +9,16 @@ import {
   ParseUUIDPipe,
   UseGuards,
   Req,
+  UseInterceptors, // 👈 NUEVO: Necesario para los interceptores
+  UploadedFile, // 👈 NUEVO: Necesario para capturar el archivo
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express'; // 👈 NUEVO: El lector de archivos
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+} from '@nestjs/swagger'; // 👈 NUEVO: ApiConsumes
 import { CompanyService } from './company.service.js';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
 import { UpdateCompanyDto } from './dto/update-company.dto.js';
@@ -21,8 +29,8 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { User } from '@prisma/client';
 
 @ApiTags('Company')
-@ApiBearerAuth() // Pone el candado en Swagger para todas las rutas
-@UseGuards(AuthGuard) // 🔒 USAMOS TU GUARD PARA PROTEGER TODO EL CONTROLADOR
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
 @Controller('company')
 export class CompanyController {
   constructor(private readonly companiesService: CompanyService) {}
@@ -31,9 +39,9 @@ export class CompanyController {
   @ApiOperation({ summary: 'Crear una empresa nueva (Solo General Admin)' })
   create(
     @Body() createCompanyDto: CreateCompanyDto,
-    @Req() req: Request & { user: User }, // 2. Capturamos la request
+    @Req() req: Request & { user: User },
   ) {
-    const requestUser = req.user; // 3. Sacamos el usuario que metió tu AuthGuard
+    const requestUser = req.user;
     return this.companiesService.create(createCompanyDto, requestUser);
   }
 
@@ -54,15 +62,25 @@ export class CompanyController {
     return this.companiesService.findOne(id, requestUser);
   }
 
+  // 🚀 AQUÍ ESTÁ LA MAGIA ARREGLADA
   @Patch(':id')
-  @ApiOperation({ summary: 'Modificar una empresa' })
+  @ApiOperation({ summary: 'Modificar una empresa y su logo' })
+  @ApiConsumes('multipart/form-data') // Le decimos a Swagger que aceptamos archivos
+  @UseInterceptors(FileInterceptor('file')) // El interceptor abre la "caja fuerte" del frontend
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateCompanyDto: UpdateCompanyDto,
+    @Body() updateCompanyDto: UpdateCompanyDto, // Ahora sí llega con todos los datos de texto
     @Req() req: Request & { user: User },
+    @UploadedFile() file?: Express.Multer.File, // Capturamos la foto de forma independiente
   ) {
     const requestUser = req.user;
-    return this.companiesService.update(id, updateCompanyDto, requestUser);
+    // Le pasamos todo (incluyendo el archivo) al servicio que ya teníamos preparado
+    return this.companiesService.update(
+      id,
+      updateCompanyDto,
+      requestUser,
+      file,
+    );
   }
 
   @Delete(':id')

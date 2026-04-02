@@ -10,8 +10,9 @@ import { EnrollmentModule } from './enrollment/enrollment.module';
 import { StorageModule } from './storage/storage.module';
 import { ContentModule } from './content/content.module';
 import { ServicesModule } from './services/services.module';
-import {MailerModule} from '@nestjs-modules/mailer';
+import { MailerModule } from '@nestjs-modules/mailer';
 import { CompanyRequestModule } from './company-request/company-request.module';
+import { ChatBotModule } from './ai/chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -28,18 +29,19 @@ import { CompanyRequestModule } from './company-request/company-request.module';
     ServicesModule,
     MailerModule.forRoot({
       transport: {
-  host: "sandbox.smtp.mailtrap.io",
-  port: 2525,
-  auth: {
-    user: process.env.MAILTRAP_USER,
-    pass: process.env.MAILTRAP_PASS,
-  },
-},
-      defaults: {
-        from: '"Atalayas" <noreply@atalayas.com>'
+        host: 'sandbox.smtp.mailtrap.io',
+        port: 2525,
+        auth: {
+          user: process.env.MAILTRAP_USER,
+          pass: process.env.MAILTRAP_PASS,
+        },
       },
-}),
+      defaults: {
+        from: '"Atalayas" <noreply@atalayas.com>',
+      },
+    }),
     CompanyRequestModule,
+    ChatBotModule,
   ],
   controllers: [],
   providers: [],
