@@ -73,7 +73,7 @@ export class CoursesService {
   async findOne(id: string, requestUser: User) {
     const course = await this.prismaService.course.findUnique({
       where: { id },
-      include: { Company: true }, // Rescatado del método 2
+      include: { Company: true, Content: true }, // Rescatado del método 2
     });
 
     // 1. Manejo semántico de errores (Rescatado del método 2)
@@ -84,7 +84,8 @@ export class CoursesService {
     // 2. Seguridad: ¿Tiene permiso para ver este curso específico?
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
-      course.companyId !== requestUser.companyId
+      course.companyId !== requestUser.companyId &&
+      !course.isPublic
     ) {
       throw new ForbiddenException('No tienes permisos para ver este curso');
     }

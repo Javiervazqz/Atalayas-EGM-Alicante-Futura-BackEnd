@@ -1,10 +1,17 @@
 import { PartialType } from '@nestjs/swagger';
 import { CreateContentDto } from './create-content.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {IsString, IsNotEmpty, IsOptional, IsUrl, IsInt} from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsUrl,
+  IsInt,
+  IsObject,
+} from 'class-validator';
 
 export class UpdateContentDto extends PartialType(CreateContentDto) {
-    @ApiProperty({
+  @ApiProperty({
     example: 'Tema 1: Introducción',
     description: 'Título del contenido',
   })
@@ -12,8 +19,25 @@ export class UpdateContentDto extends PartialType(CreateContentDto) {
   @IsOptional()
   title?: string;
 
-  @ApiProperty({ example: 1, description: 'Orden de aparición en el curso' })
-  @IsInt()
+  @IsString()
   @IsOptional()
-  order?: number;
+  summary?: string;
+
+  @IsObject()
+  @IsOptional()
+  quiz?: any;
+
+  @IsObject()
+  @IsOptional()
+  podcast?: any;
+
+  @ApiProperty({ example: 'PDF del contenido', required: false })
+  @IsOptional()
+  @IsString()
+  url?: string;
+
+  @ApiProperty({ example: 'URL de la imagen del contenido', required: false })
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
 }
