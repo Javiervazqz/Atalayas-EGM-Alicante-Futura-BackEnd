@@ -1,18 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from './prisma/prisma.module';
-import { UsersModule } from './users/users.module';
-import { AuthModule } from './auth/auth.module';
-import { CoursesModule } from './courses/courses.module';
-import { DocumentModule } from './document/document.module';
-import { CompanyModule } from './company/company.module';
-import { EnrollmentModule } from './enrollment/enrollment.module';
-import { StorageModule } from './storage/storage.module';
-import { ContentModule } from './content/content.module';
-import { ServicesModule } from './services/services.module';
+import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { CoursesModule } from './modules/courses/courses.module';
+import { DocumentModule } from './modules/document/document.module';
+import { CompanyModule } from './modules/company/company.module';
+import { EnrollmentModule } from './modules/enrollment/enrollment.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
+import { ContentModule } from './modules/content/content.module';
+import { ServicesModule } from './modules/services/services.module';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { CompanyRequestModule } from './company-request/company-request.module';
-import { ChatBotModule } from './ai/chatbot/chatbot.module';
+import { CompanyRequestModule } from './modules/company-request/company-request.module';
+import { ChatBotModule } from './infrastructure/ai/chatbot/chatbot.module';
+import { AiModule } from './infrastructure/ai/ai.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ChatBotModule } from './ai/chatbot/chatbot.module';
     StorageModule,
     ContentModule,
     ServicesModule,
+    AiModule,
     MailerModule.forRoot({
       transport: {
         host: 'sandbox.smtp.mailtrap.io',
