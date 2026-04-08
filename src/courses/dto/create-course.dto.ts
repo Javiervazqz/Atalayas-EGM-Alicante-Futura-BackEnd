@@ -16,12 +16,20 @@ export class CreateCourseDto {
   @IsOptional()
   isPublic?: boolean;
 
-  @ApiProperty({ required: false, example: 'BASICO', description: 'Categoría del curso: BASICO o ESPECIALIZADO' })
+  @ApiProperty({
+    required: false,
+    example: 'BASICO',
+    description: 'Categoría del curso: BASICO o ESPECIALIZADO',
+  })
   @IsString()
   @IsOptional()
   category?: string;
 
-  @ApiProperty({ required: false, example: 'manual.pdf', description: 'Nombre o URL del archivo' })
+  @ApiProperty({
+    required: false,
+    example: 'manual.pdf',
+    description: 'Nombre o URL del archivo',
+  })
   @IsString()
   @IsOptional()
   fileUrl?: string;
