@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException, Req } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  Req,
+} from '@nestjs/common';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,11 +13,13 @@ import { User } from '@prisma/client';
 export class ContentService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createContentDto: CreateContentDto, requestUser: User, courseId: string) {
-    console.log('courseId:', courseId);
-    console.log('requestUser:', requestUser);
-    console.log('createContentDto:', createContentDto);
-    if(requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
+  async create(
+    createContentDto: CreateContentDto,
+    requestUser: User,
+    courseId: string,
+    file?: Express.Multer.File,
+  ) {
+    if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
     const courseExists = await this.prisma.course.findUnique({
@@ -20,12 +27,13 @@ export class ContentService {
     });
 
     if (!courseExists) {
-      throw new NotFoundException(
-        `El curso con ID ${courseId} no existe.`,
-      );
+      throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
     }
 
-    if (requestUser.role === 'ADMIN' && courseExists.companyId !== requestUser.companyId) {
+    if (
+      requestUser.role === 'ADMIN' &&
+      courseExists.companyId !== requestUser.companyId
+    ) {
       throw new ForbiddenException(
         `No tienes permisos para agregar contenido a este curso.`,
       );
@@ -44,7 +52,9 @@ export class ContentService {
         title: createContentDto.title,
         order: nextOrder,
         courseId: courseId,
-      }
+        url: file ? file.originalname : createContentDto.url,
+        imageUrl: createContentDto.imageUrl,
+      },
     });
   }
 
@@ -55,14 +65,17 @@ export class ContentService {
     if (!course) {
       throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
     }
-    if (requestUser.role !== 'GENERAL_ADMIN' && course.companyId !== requestUser.companyId) {
+    if (
+      requestUser.role !== 'GENERAL_ADMIN' &&
+      course.companyId !== requestUser.companyId
+    ) {
       throw new ForbiddenException(`No tienes acceso al curso.`);
     }
     return this.prisma.content.findMany({
       where: { courseId },
       orderBy: { order: 'asc' },
       include: { Course: true }, // Traemos la información del curso al que pertenece cada contenido
-  });
+    });
   }
 
   async findOne(id: string, requestUser: User) {
@@ -74,19 +87,39 @@ export class ContentService {
     if (!content) {
       throw new NotFoundException(`Contenido con ID ${id} no encontrado`);
     }
-    if (requestUser.role !== 'GENERAL_ADMIN' && content.Course.companyId !== requestUser.companyId) {
+    if (
+      requestUser.role !== 'GENERAL_ADMIN' &&
+      content.Course.companyId !== requestUser.companyId
+    ) {
       throw new ForbiddenException(`No tienes acceso a este contenido.`);
     }
     return content;
   }
 
-  async update(id: string, updateContentDto: UpdateContentDto, requestUser: User) {
+  async update(
+    id: string,
+    updateContentDto: UpdateContentDto,
+    requestUser: User,
+    file?: Express.Multer.File,
+  ) {
     const content = await this.findOne(id, requestUser);
-    if(requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException('No tienes permisos para actualizar contenido');
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException(
+        'No tienes permisos para actualizar contenido',
+      );
     }
-    if(requestUser.role === 'ADMIN' && content.Course.companyId !== requestUser.companyId) {
-      throw new ForbiddenException('No tienes permisos para actualizar contenido de este curso');
+    if (
+      requestUser.role === 'ADMIN' &&
+      content.Course.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para actualizar contenido de este curso',
+      );
+    }
+
+    const data = { ...updateContentDto } as any;
+    if (file) {
+      data.url = file.originalname;
     }
     return this.prisma.content.update({
       where: { id },
@@ -96,11 +129,18 @@ export class ContentService {
 
   async remove(id: string, requestUser: User) {
     const content = await this.findOne(id, requestUser);
-    if(requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException('No tienes permisos para eliminar contenido');
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException(
+        'No tienes permisos para eliminar contenido',
+      );
     }
-    if(requestUser.role === 'ADMIN' && content.Course.companyId !== requestUser.companyId) {
-      throw new ForbiddenException('No tienes permisos para eliminar contenido de este curso');
+    if (
+      requestUser.role === 'ADMIN' &&
+      content.Course.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para eliminar contenido de este curso',
+      );
     }
     return this.prisma.content.delete({
       where: { id },
