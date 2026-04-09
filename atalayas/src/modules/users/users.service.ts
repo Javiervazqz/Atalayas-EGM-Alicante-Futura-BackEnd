@@ -53,7 +53,8 @@ export class UsersService {
     }
 
     // 3. Generación de contraseña temporal
-    const password = Math.random().toString(36).slice(-8);
+    const password =
+      createUserDto.password || Math.random().toString(36).slice(-8);
 
     // 4. LLAMADA CORREGIDA AL AUTH SERVICE (Error TS2554 arreglado)
     // Pasamos UN SOLO OBJETO que contenga todo lo que el RegisterDto espera
@@ -67,7 +68,7 @@ export class UsersService {
     // Retornamos la password provisional SOLO UNA VEZ para que el admin la vea
     return {
       ...authUser,
-      provisionalPassword: password,
+      provisionalPassword: createUserDto.password ? undefined : password,
     };
   }
 
@@ -133,5 +134,12 @@ export class UsersService {
     await this.authService.deleteUser(id);
 
     return { message: 'Usuario eliminado correctamente' };
+  }
+
+  async markOnboardingDone(userId: string) {
+    return this.prismaService.user.update({
+      where: { id: userId },
+      data: { onboardingDone: true },
+    });
   }
 }

@@ -54,4 +54,10 @@ export class UsersController {
   async remove(@Param('id') id: string, @Req() request: Request) {
     return await this.usersService.remove(id, request['user']);
   }
+
+  @Patch('me/onboarding-done')
+  @UseGuards(AuthGuard)
+  async markOnboardingDone(@Request() req: any) {
+    return this.usersService.markOnboardingDone(req.user.id);
+  }
 }
