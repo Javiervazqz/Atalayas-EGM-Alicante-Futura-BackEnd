@@ -86,7 +86,7 @@ export class CoursesService {
   async findOne(id: string, requestUser: User) {
     const course = await this.prismaService.course.findUnique({
       where: { id },
-      include: { Company: true },
+      include: { Company: true, Content: true },
     });
 
     if (!course) {

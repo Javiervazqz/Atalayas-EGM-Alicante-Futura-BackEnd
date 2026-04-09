@@ -61,6 +61,16 @@ export class AuthService {
         'Usuario no encontrado en la base de datos',
       );
 
+    let firstLoginAt = publicUser.firstLoginAt;
+
+    if (!firstLoginAt) {
+      const updatedUser = await this.prismaService.user.update({
+        where: { id: publicUser.id },
+        data: { firstLoginAt: new Date() },
+      });
+      firstLoginAt = updatedUser.firstLoginAt;
+    }
+
     return {
       token: data.session?.access_token,
       refreshToken: data.session?.refresh_token,
@@ -71,6 +81,8 @@ export class AuthService {
         name: publicUser.name,
         companyId: publicUser.companyId,
         avatarUrl: publicUser.avatarUrl,
+        createdAt: publicUser.createdAt,
+        firstLoginAt: firstLoginAt,
       },
     };
   }
