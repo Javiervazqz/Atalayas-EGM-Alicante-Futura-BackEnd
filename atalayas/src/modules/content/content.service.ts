@@ -2,7 +2,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  Req,
 } from '@nestjs/common';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
@@ -81,18 +80,28 @@ export class ContentService {
   async findOne(id: string, requestUser: User) {
     const content = await this.prisma.content.findUnique({
       where: { id },
-      include: { Course: true }, // Traemos la información del curso al que pertenece
+      include: {
+        Course: true,
+        // 🚀 AQUÍ ESTÁ EL CAMBIO: Traemos el progreso solo de este usuario
+        userProgresses: {
+          where: {
+            userId: requestUser.id,
+          },
+        },
+      },
     });
 
     if (!content) {
       throw new NotFoundException(`Contenido con ID ${id} no encontrado`);
     }
+
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
       content.Course.companyId !== requestUser.companyId
     ) {
       throw new ForbiddenException(`No tienes acceso a este contenido.`);
     }
+
     return content;
   }
 

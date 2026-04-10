@@ -48,33 +48,8 @@ export class EnrollmentController {
     return this.enrollmentService.findAll(req.user);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Ver detalle de una matriculación' })
-  findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request & { user: User },
-  ) {
-    return this.enrollmentService.findOne(id, req.user);
-  }
-
-  @Patch(':id')
-  @ApiOperation({ summary: 'Actualizar progreso de matriculación' })
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateEnrollmentDto: UpdateEnrollmentDto,
-    @Req() req: Request & { user: User },
-  ) {
-    return this.enrollmentService.update(id, updateEnrollmentDto, req.user);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Desmatricular a un usuario (Solo Admins)' })
-  remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request & { user: User },
-  ) {
-    return this.enrollmentService.remove(id, req.user);
-  }
+  // 🚀 RUTAS ESTÁTICAS PRIMERO 🚀
+  // Estas rutas deben evaluarse antes para que el ':id' no se las "trague"
 
   @Patch('video-progress')
   @ApiOperation({ summary: 'Actualizar el segundero de un vídeo' })
@@ -102,5 +77,35 @@ export class EnrollmentController {
       user.id,
       completeDto.contentId,
     );
+  }
+
+  // ⬇️ RUTAS DINÁMICAS (CON :id) DESPUÉS ⬇️
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Ver detalle de una matriculación' })
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.enrollmentService.findOne(id, req.user);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar progreso de matriculación' })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateEnrollmentDto: UpdateEnrollmentDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.enrollmentService.update(id, updateEnrollmentDto, req.user);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Desmatricular a un usuario (Solo Admins)' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.enrollmentService.remove(id, req.user);
   }
 }

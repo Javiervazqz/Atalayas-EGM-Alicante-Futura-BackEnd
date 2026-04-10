@@ -3,20 +3,21 @@ import {
   ForbiddenException,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { User } from '@prisma/client';
-import { AiService } from '../../infrastructure/ai/ai.service.js'; // 👈 AÑADIDO
-import { StorageService } from '../../infrastructure/storage/storage.service.js'; // 👈 AÑADIDO
+import { AiService } from '../../infrastructure/ai/ai.service.js';
+import { StorageService } from '../../infrastructure/storage/storage.service.js';
 
 @Injectable()
 export class CoursesService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly aiService: AiService, // 👈 AÑADIDO
-    private readonly storageService: StorageService, // 👈 AÑADIDO
+    private readonly aiService: AiService,
+    private readonly storageService: StorageService,
   ) {}
 
   async create(
@@ -42,7 +43,6 @@ export class CoursesService {
       );
     }
 
-    // 🚀 CORRECCIÓN: Le decimos a TypeScript que puede ser string o null
     let fileUrl: string | null = null;
 
     if (file) {
@@ -86,7 +86,12 @@ export class CoursesService {
   async findOne(id: string, requestUser: User) {
     const course = await this.prismaService.course.findUnique({
       where: { id },
-      include: { Company: true },
+      include: {
+        Company: true,
+        Content: {
+          orderBy: { order: 'asc' },
+        },
+      },
     });
 
     if (!course) {
@@ -132,7 +137,7 @@ export class CoursesService {
     });
   }
 
-  // 🚀 AQUÍ ESTÁ EL NUEVO MÉTODO PARA LA IA
+  // 🚀 MÉTODO PARA LA IA (CON GENERACIÓN DE QUIZ INCLUIDA)
   async generateContentWithAi(
     courseId: string,
     title: string,
@@ -140,7 +145,7 @@ export class CoursesService {
     pdfFile: Express.Multer.File,
     requestUser: User,
   ) {
-    // 1. Verificamos que el curso existe y el usuario tiene permisos (reutilizando tu excelente lógica)
+    // 1. Verificamos que el curso existe y el usuario tiene permisos
     const course = await this.findOne(courseId, requestUser);
 
     if (!pdfFile || pdfFile.mimetype !== 'application/pdf') {
@@ -152,6 +157,10 @@ export class CoursesService {
       pdfFile.buffer,
     );
 
+    // 🚀 2.5 NUEVO: Generamos el Test interactivo usando el resumen que acaba de crear
+    console.log('🧠 Generando test interactivo a partir del resumen...');
+    const quizData: any = await this.aiService.generateQuizFromText(script);
+
     // 3. Preparamos el archivo de audio para subirlo a Supabase
     const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
     const audioFileMock = {
@@ -160,17 +169,33 @@ export class CoursesService {
       mimetype: 'audio/mpeg',
     } as Express.Multer.File;
 
+    console.log('⏳ Subiendo audio a Storage...');
     const audioUrl = await this.storageService.uploadFile(audioFileMock);
+    console.log('✅ Audio subido. URL:', audioUrl);
 
-    // 4. Guardamos todo en la tabla Content de Prisma
-    return this.prismaService.content.create({
-      data: {
-        title: title,
-        order: Number(order) || 1,
-        courseId: course.id,
-        summary: script, // El guion que generó DeepSeek
-        url: audioUrl, // El enlace público de Supabase
-      },
-    });
+    // 4. GUARDADO EN BASE DE DATOS
+    console.log('🔥 Intentando insertar en la tabla Content de Prisma...');
+
+    try {
+      const nuevoContenido = await this.prismaService.content.create({
+        data: {
+          title: title,
+          order: Number(order) || 1,
+          courseId: course.id,
+          summary: script,
+          url: audioUrl,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          quiz: quizData, // 👈 ¡MAGIA! Guardamos el JSON del test aquí
+        },
+      });
+
+      console.log('🎉 ¡EXITO! Fila insertada en la BD:', nuevoContenido);
+      return nuevoContenido;
+    } catch (dbError) {
+      console.error('🚨 ERROR FATAL DE PRISMA AL INSERTAR:', dbError);
+      throw new InternalServerErrorException(
+        'Prisma se ha negado a guardar en la base de datos.',
+      );
+    }
   }
 }
