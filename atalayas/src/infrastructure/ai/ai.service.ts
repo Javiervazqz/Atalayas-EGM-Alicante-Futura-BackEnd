@@ -86,4 +86,53 @@ export class AiService {
       );
     }
   }
+
+  // 🚀 NUEVO MÉTODO EN TU AI.SERVICE.TS
+  async generateQuizFromText(
+    summaryText: string,
+  ): Promise<Record<string, unknown>[]> {
+    try {
+      const prompt = `
+        Eres un profesor experto. Lee el siguiente texto y genera un test de 4 preguntas de opción múltiple para evaluar la comprensión del alumno.
+        
+        REGLA ESTRICTA: Debes responder ÚNICAMENTE con un Array en formato JSON válido. No incluyas texto antes ni después del JSON. No uses markdown (sin \`\`\`json).
+        
+        Formato exacto requerido:
+        [
+          {
+            "question": "¿Pregunta de ejemplo?",
+            "options": ["Respuesta incorrecta 1", "Respuesta correcta exacta", "Respuesta incorrecta 2", "Respuesta incorrecta 3"],
+            "correctAnswer": "Respuesta correcta exacta"
+          }
+        ]
+
+        IMPORTANTE: En 'correctAnswer' debes escribir el TEXTO EXACTO de la opción correcta, no pongas "Opción A" ni letras.
+
+        Texto de la lección:
+        "${summaryText}"
+      `;
+
+      const response = await this.aiClient.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama3-8b-8192',
+        temperature: 0.3,
+      });
+
+      let jsonString: string = response?.choices?.[0]?.message?.content || '[]';
+
+      // 🛡️ TRUCO PRO: Limpiamos los backticks de markdown por si Llama 3 se pone rebelde
+      jsonString = jsonString
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+
+      // Tipamos explícitamente el parseo para que ESLint se calme
+      const parsedData = JSON.parse(jsonString) as Record<string, unknown>[];
+
+      return parsedData;
+    } catch (error) {
+      console.error('🚨 Error generando el Quiz con IA:', error);
+      return []; // Devolvemos un array vacío en lugar de null para evitar errores de tipo
+    }
+  }
 }

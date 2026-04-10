@@ -12,7 +12,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 
 import { Request } from 'express';
 import { User } from '@prisma/client';
@@ -26,6 +26,7 @@ import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { AuthGuard } from '../../common/guards/auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { GenerateAiContentDto } from './dto/generate-ai.dto.js';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
@@ -74,14 +75,19 @@ export class CoursesController {
   @Post(':id/content/ai')
   @Roles('ADMIN', 'GENERAL_ADMIN')
   @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: GenerateAiContentDto }) // 👈 1. ¡Swagger dibuja el formulario gracias a esto!
   @UseInterceptors(FileInterceptor('file'))
   async generateAiContent(
     @Param('id') courseId: string,
-    @Body('title') title: string,
-    @Body('order') order: string,
+    @Body('title') title: string, // 👈 2. Recogemos el dato suelto (bypasseando el validador estricto)
+    @Body('order') order: string, // 👈 3. Recogemos el dato suelto
     @UploadedFile() file: Express.Multer.File,
-    @Req() req: Request & { user: User }, // 👈 Cambiamos 'any' aquí también
+    @Req() req: Request & { user: User },
   ) {
+    console.log(
+      `🚀 ¡Petición recibida en el controlador! Título: ${title}, Orden: ${order}`,
+    );
+
     return await this.coursesService.generateContentWithAi(
       courseId,
       title,

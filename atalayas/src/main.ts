@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module'; // (Añade .js si sigues en modo estricto ESM)
 import { ValidationPipe } from '@nestjs/common';
