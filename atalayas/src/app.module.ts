@@ -14,6 +14,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { CompanyRequestModule } from './modules/company-request/company-request.module';
 import { ChatBotModule } from './infrastructure/ai/chatbot/chatbot.module';
 import { AiModule } from './infrastructure/ai/ai.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { AiModule } from './infrastructure/ai/ai.module';
     }),
     CompanyRequestModule,
     ChatBotModule,
+    OnboardingModule,
   ],
   controllers: [],
   providers: [],

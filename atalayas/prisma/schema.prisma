@@ -537,7 +537,7 @@ model User {
   Company          Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   users            users              @relation(fields: [id], references: [id], onDelete: Cascade)
   userProgresses   UserProgress[]
-  UserTaskProgress UserTaskProgress[]
+  userTaskProgress UserTaskProgress[]
 
   @@schema("public")
 }
@@ -648,40 +648,40 @@ model webauthn_credentials {
 }
 
 model OnboardingStep {
-  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  day            Int              @db.SmallInt
-  title          String
-  description    String?
-  badge          String?
-  companyId      String           @db.Uuid
-  created_at     DateTime         @default(now()) @db.Timestamptz(6)
-  Company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  OnboardingTask OnboardingTask[]
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  day             Int              @db.SmallInt
+  title           String
+  description     String?
+  badge           String?
+  companyId       String           @db.Uuid
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  Company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  onboardingTasks OnboardingTask[]
 
   @@unique([companyId, day])
   @@schema("public")
 }
 
 model OnboardingTask {
-  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label            String
-  stepId           String             @db.Uuid
-  created_at       DateTime           @default(now()) @db.Timestamptz(6)
-  OnboardingStep   OnboardingStep     @relation(fields: [stepId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  UserTaskProgress UserTaskProgress[]
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label          String
+  stepId         String             @db.Uuid
+  created_at     DateTime           @default(now()) @db.Timestamptz(6)
+  OnboardingStep OnboardingStep     @relation(fields: [stepId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userProgress   UserTaskProgress[]
 
   @@unique([stepId, label])
   @@schema("public")
 }
 
 model UserTaskProgress {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String         @db.Uuid
-  taskId         String         @db.Uuid
-  done           Boolean?       @default(false)
-  created_at     DateTime       @default(now()) @db.Timestamptz(6)
-  OnboardingTask OnboardingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  User           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String         @db.Uuid
+  taskId     String         @db.Uuid
+  done       Boolean?       @default(false)
+  created_at DateTime       @default(now()) @db.Timestamptz(6)
+  Task       OnboardingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  User       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, taskId])
   @@schema("public")
