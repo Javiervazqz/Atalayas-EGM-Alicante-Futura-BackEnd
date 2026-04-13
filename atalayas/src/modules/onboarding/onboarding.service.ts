@@ -34,28 +34,30 @@ export class OnboardingService {
 
         // 2. Upsert de las Tareas (en lugar de delete + create)
         if (step.tasks) {
-          for (const taskLabel of step.tasks) {
+          for (const task of step.tasks) {
             await tx.onboardingTask.upsert({
               where: {
                 stepId_label: {
                   stepId: updatedStep.id,
-                  label: taskLabel,
+                  label: task.label,
                 },
               },
-              update: {}, // Si la tarea existe y el nombre es igual, no hacemos nada (mantiene el ID)
+              update: {
+                linkAction: task.linkAction || null,
+              }, // Si la tarea existe y el nombre es igual, no hacemos nada (mantiene el ID)
               create: {
-                label: taskLabel,
+                label: task.label,
+                linkAction: task.linkAction || null,
                 stepId: updatedStep.id,
               },
             });
           }
 
-          // 3. Borrar tareas que ya no están en el nuevo plan
-          // Esto limpia las tareas que el admin eliminó de la lista
+          const taskLabels = step.tasks.map((t) => t.label);
           await tx.onboardingTask.deleteMany({
             where: {
               stepId: updatedStep.id,
-              label: { notIn: step.tasks },
+              label: { notIn: taskLabels },
             },
           });
         }
@@ -63,6 +65,14 @@ export class OnboardingService {
         createdSteps.push(updatedStep);
       }
       return createdSteps;
+    });
+  }
+
+  async completeTask(userId: string, taskId: string) {
+    return this.prisma.userTaskProgress.upsert({
+      where: { userId_taskId: { userId, taskId } },
+      update: { done: true }, // Siempre true porque es automático
+      create: { userId, taskId, done: true },
     });
   }
 
