@@ -97,7 +97,8 @@ export class ContentService {
 
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
-      content.Course.companyId !== requestUser.companyId
+      content.Course.companyId !== requestUser.companyId &&
+      !content.Course.isPublic
     ) {
       throw new ForbiddenException(`No tienes acceso a este contenido.`);
     }

@@ -665,6 +665,7 @@ model OnboardingStep {
 model OnboardingTask {
   id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   label          String
+  linkAction     String?
   stepId         String             @db.Uuid
   created_at     DateTime           @default(now()) @db.Timestamptz(6)
   OnboardingStep OnboardingStep     @relation(fields: [stepId], references: [id], onDelete: Cascade, onUpdate: NoAction)
