@@ -46,14 +46,7 @@ export class CoursesService {
     let fileUrl: string | null = null;
 
     if (file) {
-      const fileName = `curso_pdf_${Date.now()}.pdf`;
-      const pdfMock = {
-        buffer: file.buffer,
-        originalname: fileName,
-        mimetype: file.mimetype,
-      } as Express.Multer.File;
-
-      fileUrl = await this.storageService.uploadFile(pdfMock);
+      fileUrl = await this.storageService.uploadFile(file);
     }
 
     return await this.prismaService.course.create({
@@ -114,11 +107,9 @@ export class CoursesService {
     requestUser: User,
   ) {
     const course = await this.findOne(id, requestUser);
-
     if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('No tienes permisos para actualizar cursos');
     }
-
     return this.prismaService.course.update({
       where: { id: course.id },
       data: updateCourseDto,
@@ -127,75 +118,11 @@ export class CoursesService {
 
   async remove(id: string, requestUser: User) {
     const course = await this.findOne(id, requestUser);
-
     if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('No tienes permisos para eliminar cursos');
     }
-
     return this.prismaService.course.delete({
       where: { id: course.id },
     });
-  }
-
-  // 🚀 MÉTODO PARA LA IA (CON GENERACIÓN DE QUIZ INCLUIDA)
-  async generateContentWithAi(
-    courseId: string,
-    title: string,
-    order: number,
-    pdfFile: Express.Multer.File,
-    requestUser: User,
-  ) {
-    // 1. Verificamos que el curso existe y el usuario tiene permisos
-    const course = await this.findOne(courseId, requestUser);
-
-    if (!pdfFile || pdfFile.mimetype !== 'application/pdf') {
-      throw new BadRequestException('Por favor, sube un archivo PDF válido.');
-    }
-
-    // 2. Pasamos el PDF a nuestro AiService para que haga la magia (DeepSeek + ElevenLabs)
-    const { script, audioBase64 } = await this.aiService.generatePodcastFromPdf(
-      pdfFile.buffer,
-    );
-
-    // 🚀 2.5 NUEVO: Generamos el Test interactivo usando el resumen que acaba de crear
-    console.log('🧠 Generando test interactivo a partir del resumen...');
-    const quizData: any = await this.aiService.generateQuizFromText(script);
-
-    // 3. Preparamos el archivo de audio para subirlo a Supabase
-    const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
-    const audioFileMock = {
-      buffer: Buffer.from(audioBase64, 'base64'),
-      originalname: fileName,
-      mimetype: 'audio/mpeg',
-    } as Express.Multer.File;
-
-    console.log('⏳ Subiendo audio a Storage...');
-    const audioUrl = await this.storageService.uploadFile(audioFileMock);
-    console.log('✅ Audio subido. URL:', audioUrl);
-
-    // 4. GUARDADO EN BASE DE DATOS
-    console.log('🔥 Intentando insertar en la tabla Content de Prisma...');
-
-    try {
-      const nuevoContenido = await this.prismaService.content.create({
-        data: {
-          title: title,
-          order: Number(order) || 1,
-          courseId: course.id,
-          summary: script,
-          url: audioUrl,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          quiz: quizData, // 👈 ¡MAGIA! Guardamos el JSON del test aquí
-        },
-      });
-
-      console.log('🎉 ¡EXITO! Fila insertada en la BD:', nuevoContenido);
-      return nuevoContenido;
-    } catch (dbError) {
-      console.error('🚨 ERROR FATAL DE PRISMA AL INSERTAR:', dbError);
-      throw new InternalServerErrorException(
-        'Prisma se ha negado a guardar en la base de datos.',
-      );
-    }
   }
 }

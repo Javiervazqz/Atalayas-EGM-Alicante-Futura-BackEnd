@@ -16,25 +16,24 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AiService } from './ai.service.js';
-import { AuthGuard } from '../../common/guards/auth.guard.js'; // 👈 Usando tu Guard
+import { AuthGuard } from '../../common/guards/auth.guard.js';
 
-@ApiTags('IA') // Agrupa en Swagger
+@ApiTags('IA')
 @ApiBearerAuth()
 @Controller('ai')
-@UseGuards(AuthGuard) // 👈 Protegido igual que el ChatBot
+@UseGuards(AuthGuard)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
   @Post('test-podcast')
-  @HttpCode(200) // 👈 Igual que tu controlador de Chat
+  @HttpCode(200)
   @ApiOperation({ summary: 'Genera un audio podcast a partir de un PDF' })
-  @ApiConsumes('multipart/form-data') // 👈 Necesario para que Swagger muestre el botón de subir archivo
+  @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         file: {
-          // Este es el nombre que usaremos en el Form-Data
           type: 'string',
           format: 'binary',
         },
@@ -46,7 +45,10 @@ export class AiController {
     @Request() req: any,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // Aquí podrías usar req.user.id si quisieras guardar quién generó el audio
-    return this.aiService.generatePodcastFromPdf(file.buffer);
+    // 1. Extraemos el texto del buffer del PDF usando el nuevo método del servicio
+    const rawText = await this.aiService.extractTextFromPdf(file.buffer);
+
+    // 2. Llamamos al método actualizado 'generatePodcast' pasando el texto
+    return this.aiService.generatePodcast(rawText);
   }
 }

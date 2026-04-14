@@ -34,5 +34,5 @@ export class CreateCourseDto {
     description: 'Archivo PDF del curso',
   })
   @IsOptional()
-  file?: any;
+  fileUrl?: any;
 }
