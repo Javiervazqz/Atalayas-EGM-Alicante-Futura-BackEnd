@@ -8,7 +8,7 @@ export class CreateContentDto {
   })
   @IsString()
   @IsNotEmpty()
-  title: string;
+  title!: string;
 
   @ApiPropertyOptional({
     description: 'Opciones de IA en formato JSON string',

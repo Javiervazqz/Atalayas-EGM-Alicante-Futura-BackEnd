@@ -5,7 +5,7 @@ import { Transform } from 'class-transformer';
 export class CreateCourseDto {
   @ApiProperty({ example: 'Nombre del curso' })
   @IsString()
-  title: string;
+  title!: string;
 
   @ApiProperty({ required: false, example: '' })
   @IsUUID()
