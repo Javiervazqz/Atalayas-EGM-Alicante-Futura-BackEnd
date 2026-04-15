@@ -5,7 +5,7 @@ import { Transform } from 'class-transformer';
 export class CreateCourseDto {
   @ApiProperty({ example: 'Nombre del curso' })
   @IsString()
-  title: string;
+  title!: string;
 
   @ApiProperty({ required: false, example: '' })
   @IsUUID()
@@ -34,5 +34,5 @@ export class CreateCourseDto {
     description: 'Archivo PDF del curso',
   })
   @IsOptional()
-  file?: any;
+  fileUrl?: any;
 }

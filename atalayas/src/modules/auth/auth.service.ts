@@ -69,6 +69,7 @@ export class AuthService {
       const updatedUser = await this.prismaService.user.update({
         where: { id: publicUser.id },
         data: { firstLoginAt: new Date() },
+        include: { Company: true },
       });
       firstLoginAt = updatedUser.firstLoginAt;
     }
@@ -82,6 +83,7 @@ export class AuthService {
         role: publicUser.role,
         name: publicUser.name,
         companyId: publicUser.companyId,
+        Company: publicUser.Company,
         avatarUrl: publicUser.avatarUrl,
         createdAt: publicUser.createdAt,
         firstLoginAt: firstLoginAt,
