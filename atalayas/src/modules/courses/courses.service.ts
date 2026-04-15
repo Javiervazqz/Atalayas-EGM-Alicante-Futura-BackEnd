@@ -70,6 +70,7 @@ export class CoursesService {
       });
     }
     return await this.prismaService.course.findMany({
+      include: { Content: true },
       where: {
         OR: [{ companyId: requestUser.companyId }, { isPublic: true }],
       },
@@ -93,7 +94,8 @@ export class CoursesService {
 
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
-      course.companyId !== requestUser.companyId
+      course.companyId !== requestUser.companyId &&
+      !course.isPublic
     ) {
       throw new ForbiddenException('No tienes permisos para ver este curso');
     }
