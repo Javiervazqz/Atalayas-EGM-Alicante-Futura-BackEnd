@@ -10,8 +10,6 @@ import { User } from '@prisma/client';
 import { AiService } from '../../infrastructure/ai/ai.service';
 import { StorageService } from '../../infrastructure/storage/storage.service';
 
-// ... (imports iguales)
-
 @Injectable()
 export class ContentService {
   constructor(
@@ -26,6 +24,7 @@ export class ContentService {
     courseId: string,
     file?: Express.Multer.File,
   ) {
+    // 1. Validaciones de permisos
     if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
@@ -33,14 +32,18 @@ export class ContentService {
     const courseExists = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
-    if (!courseExists)
-      throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
 
+    if (!courseExists) {
+      throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
+    }
+
+    // 2. Parsear opciones de IA
     let options = {
       generateSummary: false,
       generateQuiz: false,
       generatePodcast: false,
     };
+
     try {
       if (createContentDto.options) {
         options =
@@ -49,17 +52,16 @@ export class ContentService {
             : createContentDto.options;
       }
     } catch (e) {
-      console.error('Error parsing options', e);
+      console.error('Error parsing options JSON', e);
     }
 
     let finalUrl = createContentDto.url;
     let summary = '';
-    let podcastData: any = null;
+    let podcastData: { url: string; script: string } | null = null;
     let quizData: any = null;
 
-    // --- CAMBIO CLAVE AQUÍ ---
+    // 3. Procesamiento de archivo y IA
     if (file) {
-      // 1. Subir el archivo original una sola vez
       finalUrl = await this.storageService.uploadFile(file);
 
       if (
@@ -67,50 +69,67 @@ export class ContentService {
         options.generateQuiz ||
         options.generatePodcast
       ) {
-        // 2. Extraer el texto del buffer una sola vez
         const rawText = await this.aiService.extractTextFromPdf(file.buffer);
 
-        // 3. Procesar las peticiones de IA de forma secuencial con el mismo rawText
+        // Ejecutamos en paralelo para ganar velocidad
+        const tasks: Promise<any>[] = [];
+
         if (options.generateSummary) {
-          summary = await this.aiService.generateSummary(rawText);
+          tasks.push(
+            this.aiService
+              .generateSummary(rawText)
+              .then((res) => (summary = res)),
+          );
         }
 
         if (options.generateQuiz) {
-          quizData = await this.aiService.generateQuiz(rawText);
+          tasks.push(
+            this.aiService
+              .generateQuiz(rawText)
+              .then((res) => (quizData = res)),
+          );
         }
 
         if (options.generatePodcast) {
-          const { script, audioBuffer } =
-            await this.aiService.generatePodcast(rawText);
-          const audioFileMock = {
-            buffer: audioBuffer,
-            originalname: `podcast_${Date.now()}.mp3`,
-            mimetype: 'audio/mpeg',
-          } as Express.Multer.File;
-
-          const audioUrl = await this.storageService.uploadFile(audioFileMock);
-          podcastData = { url: audioUrl, script };
+          tasks.push(
+            (async () => {
+              const { script, audioBuffer } =
+                await this.aiService.generatePodcast(rawText);
+              const audioFileMock = {
+                buffer: audioBuffer,
+                originalname: `podcast_${Date.now()}.mp3`,
+                mimetype: 'audio/mpeg',
+              } as Express.Multer.File;
+              const audioUrl =
+                await this.storageService.uploadFile(audioFileMock);
+              podcastData = { url: audioUrl, script: script };
+            })(),
+          );
         }
+
+        await Promise.all(tasks);
       }
     }
 
+    // 4. Lógica de orden
     const lastContent = await this.prisma.content.findFirst({
-      where: { courseId },
+      where: { courseId: courseId },
       orderBy: { order: 'desc' },
     });
     const nextOrder = lastContent ? lastContent.order + 1 : 1;
 
-    return this.prisma.content.create({
-      data: {
-        title: createContentDto.title,
-        courseId,
-        url: finalUrl,
-        summary,
-        quiz: quizData || null,
-        podcast: podcastData || null,
-        order: nextOrder,
-      },
-    });
+    // 5. Guardado Final
+    const dataToSave = {
+      title: createContentDto.title,
+      courseId: courseId,
+      url: finalUrl,
+      summary: summary,
+      quiz: quizData ? (quizData as any) : null,
+      podcast: podcastData ? (podcastData as any) : null, // Forzamos el guardado del objeto
+      order: nextOrder,
+    };
+
+    return this.prisma.content.create({ data: dataToSave });
   }
 
   async findAll(requestUser: User, courseId: string) {
