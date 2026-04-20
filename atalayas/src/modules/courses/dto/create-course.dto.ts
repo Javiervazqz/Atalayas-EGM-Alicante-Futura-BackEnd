@@ -25,14 +25,4 @@ export class CreateCourseDto {
   @IsString()
   @IsOptional()
   category?: string;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  @ApiProperty({
-    type: 'string',
-    format: 'binary',
-    required: false,
-    description: 'Archivo PDF del curso',
-  })
-  @IsOptional()
-  fileUrl?: any;
 }

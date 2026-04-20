@@ -22,9 +22,6 @@ export class AiService {
     return pdfData.text || '';
   }
 
-  // 2. Generar Resumen
-  // ... (imports y constructor iguales)
-
   // 1. Resumen: Forzamos texto plano sin símbolos extraños
   async generateSummary(text: string): Promise<string> {
     const completion = await this.aiClient.chat.completions.create({
@@ -33,7 +30,12 @@ export class AiService {
         {
           role: 'system',
           content:
-            'Eres un redactor experto. Crea un resumen educativo del texto. IMPORTANTE: No uses Markdown (ni #, ni *, ni **). Usa solo saltos de línea naturales y mayúsculas para títulos. Además, usa negrita para los títulos',
+            'Eres un redactor experto en síntesis de información. Tu objetivo es crear un resumen estructurado.\n' +
+            'REGLAS DE FORMATO:\n' +
+            '- Usa **MAYÚSCULAS EN NEGRITA** para títulos de secciones.\n' +
+            '- Usa listas con guiones (-) para desglosar información importante.\n' +
+            '- Usa **negritas** para términos técnicos o frases clave.\n' +
+            '- No uses encabezados de Markdown tipo # o ##, prefiere las negritas con asteriscos.',
         },
         { role: 'user', content: text },
       ],
@@ -49,49 +51,87 @@ export class AiService {
         {
           role: 'system',
           content:
-            'Genera un test de 3 preguntas basado en el texto. Devuelve ÚNICAMENTE un objeto JSON con esta estructura exacta: {"questions": [{"question": "...", "options": ["...", "...", "..."], "correctAnswer": "..."}]}. Asegúrate de que la correctAnswer coincida exactamente con una de las opciones.',
+            'Genera un test de 4 preguntas basado en el texto. Devuelve ÚNICAMENTE un objeto JSON con esta estructura exacta: {"questions": [{"question": "...", "options": ["...", "...", "..."], "correctAnswer": "..."}]}. Asegúrate de que la correctAnswer coincida exactamente con una de las opciones.',
         },
         { role: 'user', content: text },
       ],
       response_format: { type: 'json_object' },
     });
 
-    const res = JSON.parse(completion.choices[0].message.content || '');
-    // Retornamos solo el array de preguntas
+    const res = JSON.parse(completion.choices[0].message.content || '{}');
     return res.questions || res;
   }
 
-  // 3. Podcast: Mejoramos el guion para que tenga contenido real
+  // 3. Podcast: Generación de guion con Groq y Audio con ElevenLabs
   async generatePodcast(
     text: string,
   ): Promise<{ script: string; audioBuffer: Buffer }> {
-    const completion = await this.aiClient.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
+    try {
+      // 1. Generar el guion con Groq
+      // IMPORTANTE: Metemos todo dentro del TRY para que cualquier error sea capturado
+      const completion = await this.aiClient.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Eres un locutor de contenidos formativos ameno. Crea un guion narrativo de 150-200 palabras sin Markdown.',
+          },
+          { role: 'user', content: text },
+        ],
+      });
+
+      const rawScript = completion.choices[0].message.content || '';
+
+      // 2. Limpieza de texto
+      const cleanScript = rawScript
+        .replace(/\*\*|__/g, '')
+        .replace(/#+/g, '')
+        .replace(/\[.*?\]/g, '')
+        .trim();
+
+      // 3. Llamada a ElevenLabs
+      const audioResponse = await axios.post(
+        `https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL`,
         {
-          role: 'system',
-          content:
-            'Eres un locutor de radio ameno. Crea un guion de podcast donde expliques los puntos clave del texto de forma narrativa. El guion debe tener al menos 200 palabras para que dure más de un minuto.',
+          text: cleanScript,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
         },
-        { role: 'user', content: text },
-      ],
-    });
+        {
+          headers: {
+            'xi-api-key': process.env.ELEVENLABS_API_KEY,
+            'Content-Type': 'application/json',
+          },
+          responseType: 'arraybuffer',
+        },
+      );
 
-    const script = completion.choices[0].message.content || '';
+      // RETORNO DE ÉXITO
+      return {
+        script: cleanScript,
+        audioBuffer: Buffer.from(audioResponse.data),
+      };
+    } catch (error: any) {
+      // RETORNO DE ERROR: Al usar 'throw', TS entiende que la función "sale" de forma segura.
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 402) {
+          throw new InternalServerErrorException(
+            'Cuota de ElevenLabs agotada.',
+          );
+        }
+        if (error.response?.status === 404) {
+          throw new InternalServerErrorException(
+            'Voz no encontrada en ElevenLabs.',
+          );
+        }
+      }
 
-    const audioResponse = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/IKne3meq5aSn9XLyUdCD`, // Voz: Charlie
-      {
-        text: script,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      },
-      {
-        headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-        responseType: 'arraybuffer',
-      },
-    );
-
-    return { script, audioBuffer: Buffer.from(audioResponse.data) };
+      throw new InternalServerErrorException(
+        error instanceof Error
+          ? error.message
+          : 'Error crítico en el proceso de Podcast',
+      );
+    }
   }
 }
