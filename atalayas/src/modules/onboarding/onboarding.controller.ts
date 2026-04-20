@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Req,
+  UseGuards,
+  Param,
+} from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -38,5 +47,10 @@ export class OnboardingController {
       body.taskId,
       body.done,
     );
+  }
+
+  @Patch('complete-auto/:taskId')
+  async completeAuto(@Req() req, @Param('taskId') taskId: string) {
+    return this.onboardingService.completeTask(req.user.id, taskId);
   }
 }

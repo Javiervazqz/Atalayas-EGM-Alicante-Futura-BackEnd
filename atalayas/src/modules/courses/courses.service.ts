@@ -120,6 +120,7 @@ export class CoursesService {
       });
     }
     return await this.prismaService.course.findMany({
+      include: { Content: true },
       where: {
         OR: [{ companyId: requestUser.companyId }, { isPublic: true }],
       },

@@ -72,6 +72,14 @@ export class OnboardingService {
     });
   }
 
+  async completeTask(userId: string, taskId: string) {
+    return this.prisma.userTaskProgress.upsert({
+      where: { userId_taskId: { userId, taskId } },
+      update: { done: true }, // Siempre true porque es automático
+      create: { userId, taskId, done: true },
+    });
+  }
+
   async getEmployeeDashboard(userId: string, companyId: string) {
     return this.prisma.onboardingStep.findMany({
       where: { companyId },
