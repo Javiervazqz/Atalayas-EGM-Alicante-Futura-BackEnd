@@ -120,11 +120,11 @@ export class CoursesService {
       });
     }
     return await this.prismaService.course.findMany({
-      include: { Content: true },
       where: {
         OR: [{ companyId: requestUser.companyId }, { isPublic: true }],
       },
       include: {
+        Content: true,
         _count: {
           select: {
             Content: true,
@@ -133,10 +133,6 @@ export class CoursesService {
       },
     });
   }
-
-  /**
-   * OBTENER UN CURSO
-   */
   async findOne(id: string, requestUser: User) {
     const course = await this.prismaService.course.findUnique({
       where: { id },
