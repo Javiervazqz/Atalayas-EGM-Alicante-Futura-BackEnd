@@ -184,4 +184,60 @@ export class CoursesService {
       where: { id: course.id },
     });
   }
+
+  async generateContentWithAi(
+    courseId: string,
+    title: string,
+    order: number,
+    pdfFile: Express.Multer.File,
+    requestUser: User,
+  ) {
+    const course = await this.findOne(courseId, requestUser);
+
+    if (!pdfFile || pdfFile.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Por favor, sube un archivo PDF válido.');
+    }
+
+    const { script, audioBase64 } = await this.aiService.generatePodcastFromPdf(
+      pdfFile.buffer,
+    );
+
+    console.log('🧠 Generando test interactivo a partir del resumen...');
+    const quizData: any = await this.aiService.generateQuizFromText(script);
+
+    const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
+    const audioFileMock = {
+      buffer: Buffer.from(audioBase64, 'base64'),
+      originalname: fileName,
+      mimetype: 'audio/mpeg',
+    } as Express.Multer.File;
+
+    console.log('⏳ Subiendo audio a Storage...');
+    const audioUrl = await this.storageService.uploadFile(audioFileMock);
+    console.log('✅ Audio subido. URL:', audioUrl);
+
+    console.log('🔥 Intentando insertar en la tabla Content de Prisma...');
+
+    try {
+      const nuevoContenido = await this.prismaService.content.create({
+        data: {
+          title: title,
+          order: Number(order) || 1,
+          courseId: course.id,
+          summary: script,
+          url: audioUrl,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          quiz: quizData,
+        },
+      });
+
+      console.log('🎉 ¡EXITO! Fila insertada en la BD:', nuevoContenido);
+      return nuevoContenido;
+    } catch (dbError) {
+      console.error('🚨 ERROR FATAL DE PRISMA AL INSERTAR:', dbError);
+      throw new InternalServerErrorException(
+        'Prisma se ha negado a guardar en la base de datos.',
+      );
+    }
+  }
 }
