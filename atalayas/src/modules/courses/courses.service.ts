@@ -140,6 +140,11 @@ export class CoursesService {
         Company: true,
         Content: {
           orderBy: { order: 'asc' },
+          include: {
+            userProgresses: {
+              where: { userId: requestUser.id },
+            },
+          },
         },
       },
     });

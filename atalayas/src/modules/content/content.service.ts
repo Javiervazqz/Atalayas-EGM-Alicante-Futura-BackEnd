@@ -152,25 +152,26 @@ export class ContentService {
   }
 
   async findOne(id: string, requestUser: User) {
-    const todos = await this.prisma.content.findMany({
-      select: { id: true, title: true },
-    });
-    console.log('IDs que existen en la tabla Content:', todos);
-    console.log('ID que estás intentando buscar:', id);
+    // Eliminamos los console.log de depuración para producción
     const content = await this.prisma.content.findUnique({
       where: { id },
       include: {
         Course: true,
+        // 1. Incluimos el progreso del usuario que hace la petición
+        userProgresses: {
+          where: {
+            userId: requestUser.id,
+          },
+        },
       },
     });
 
     if (!content) throw new NotFoundException(`Contenido no encontrado en DB`);
 
-    // Si es un administrador global, saltamos validaciones
+    // Si es un administrador global, devolvemos todo directamente
     if (requestUser.role === 'GENERAL_ADMIN') return content;
 
-    // IMPORTANTE: Accedemos a 'course' en minúscula si así está en el include
-    const courseData = (content as any).course || (content as any).Course;
+    const courseData = content.Course;
 
     if (!courseData) {
       throw new Error(
@@ -178,7 +179,7 @@ export class ContentService {
       );
     }
 
-    // Validación de seguridad
+    // Validación de seguridad por compañía
     if (
       courseData.companyId !== requestUser.companyId &&
       !courseData.isPublic
@@ -188,7 +189,18 @@ export class ContentService {
       );
     }
 
-    return content;
+    // 2. Aplanamos la respuesta para que el frontend reciba "isCompleted" directamente
+    // En lugar de UserProgress: [{ isCompleted: true }]
+    const { userProgresses, ...rest } = content;
+
+    return {
+      ...rest,
+      isCompleted:
+        userProgresses.length > 0 ? userProgresses[0].isCompleted : false,
+      // Opcional: puedes devolver también la fecha si la necesitas
+      completedAt:
+        userProgresses.length > 0 ? userProgresses[0].completedAt : null,
+    };
   }
 
   async update(
@@ -212,5 +224,38 @@ export class ContentService {
       throw new ForbiddenException('Sin permisos');
 
     return this.prisma.content.delete({ where: { id } });
+  }
+  async completeQuiz(
+    contentId: string,
+    requestUser: User,
+    data: { score: number; totalQuestions: number },
+  ) {
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId },
+    });
+
+    if (!content) {
+      throw new NotFoundException('Contenido no encontrado');
+    }
+
+    const isPerfectScore = data.score === data.totalQuestions;
+
+    return this.prisma.userProgress.upsert({
+      where: {
+        userId_contentId: {
+          userId: requestUser.id,
+          contentId: contentId,
+        },
+      },
+      update: {
+        isCompleted: isPerfectScore,
+        completedAt: isPerfectScore ? new Date() : undefined,
+      },
+      create: {
+        userId: requestUser.id,
+        contentId: contentId,
+        isCompleted: isPerfectScore,
+      },
+    });
   }
 }
