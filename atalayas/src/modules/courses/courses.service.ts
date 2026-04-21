@@ -98,9 +98,11 @@ export class CoursesService {
       throw new NotFoundException(`El curso con ID ${id} no existe`);
     }
 
+    // 👇 AQUÍ ESTABA EL ERROR: Faltaba dejar pasar si el curso era público 👇
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
-      course.companyId !== requestUser.companyId
+      course.companyId !== requestUser.companyId &&
+      !course.isPublic
     ) {
       throw new ForbiddenException('No tienes permisos para ver este curso');
     }
@@ -137,7 +139,6 @@ export class CoursesService {
     });
   }
 
-  // 🚀 MÉTODO PARA LA IA (CON GENERACIÓN DE QUIZ INCLUIDA)
   async generateContentWithAi(
     courseId: string,
     title: string,
@@ -145,23 +146,19 @@ export class CoursesService {
     pdfFile: Express.Multer.File,
     requestUser: User,
   ) {
-    // 1. Verificamos que el curso existe y el usuario tiene permisos
     const course = await this.findOne(courseId, requestUser);
 
     if (!pdfFile || pdfFile.mimetype !== 'application/pdf') {
       throw new BadRequestException('Por favor, sube un archivo PDF válido.');
     }
 
-    // 2. Pasamos el PDF a nuestro AiService para que haga la magia (DeepSeek + ElevenLabs)
     const { script, audioBase64 } = await this.aiService.generatePodcastFromPdf(
       pdfFile.buffer,
     );
 
-    // 🚀 2.5 NUEVO: Generamos el Test interactivo usando el resumen que acaba de crear
     console.log('🧠 Generando test interactivo a partir del resumen...');
     const quizData: any = await this.aiService.generateQuizFromText(script);
 
-    // 3. Preparamos el archivo de audio para subirlo a Supabase
     const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
     const audioFileMock = {
       buffer: Buffer.from(audioBase64, 'base64'),
@@ -173,7 +170,6 @@ export class CoursesService {
     const audioUrl = await this.storageService.uploadFile(audioFileMock);
     console.log('✅ Audio subido. URL:', audioUrl);
 
-    // 4. GUARDADO EN BASE DE DATOS
     console.log('🔥 Intentando insertar en la tabla Content de Prisma...');
 
     try {
@@ -185,7 +181,7 @@ export class CoursesService {
           summary: script,
           url: audioUrl,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          quiz: quizData, // 👈 ¡MAGIA! Guardamos el JSON del test aquí
+          quiz: quizData,
         },
       });
 

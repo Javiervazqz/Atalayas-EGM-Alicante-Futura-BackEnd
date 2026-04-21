@@ -54,6 +54,7 @@ export class AuthService {
 
     const publicUser = await this.prismaService.user.findUnique({
       where: { id: data.user.id },
+      include: { Company: true },
     });
 
     if (!publicUser)
@@ -80,6 +81,7 @@ export class AuthService {
         role: publicUser.role,
         name: publicUser.name,
         companyId: publicUser.companyId,
+        Company: publicUser.Company,
         avatarUrl: publicUser.avatarUrl,
         createdAt: publicUser.createdAt,
         firstLoginAt: firstLoginAt,
