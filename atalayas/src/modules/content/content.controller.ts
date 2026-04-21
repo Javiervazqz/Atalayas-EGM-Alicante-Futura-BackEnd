@@ -100,7 +100,6 @@ export class ContentController {
     return await this.contentService.remove(contentId, req.user);
   }
 
-  // 6. COMPLETAR TEST (Guardar progreso)
   @Post(':courseId/content/:contentId/complete') // Ajustada para seguir tu patrón de rutas
   @ApiOperation({ summary: 'Marcar unidad como completada al aprobar el quiz' })
   async complete(
