@@ -9,6 +9,7 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { User } from '@prisma/client';
 import { AiService } from '../../infrastructure/ai/ai.service';
 import { StorageService } from '../../infrastructure/storage/storage.service';
+import { EnrollmentService } from '../enrollment/enrollment.service';
 
 @Injectable()
 export class ContentService {
@@ -16,7 +17,8 @@ export class ContentService {
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly storageService: StorageService,
-  ) {}
+    private readonly enrollmentService: EnrollmentService
+  ) { }
 
   async create(
     createContentDto: CreateContentDto,
@@ -240,7 +242,7 @@ export class ContentService {
 
     const isPerfectScore = data.score === data.totalQuestions;
 
-    return this.prisma.userProgress.upsert({
+    const progress = await this.prisma.userProgress.upsert({
       where: {
         userId_contentId: {
           userId: requestUser.id,
@@ -257,5 +259,14 @@ export class ContentService {
         isCompleted: isPerfectScore,
       },
     });
+
+    if (isPerfectScore) {
+      await this.enrollmentService.completeManualLesson(
+        requestUser.id,
+        contentId
+      );
+    }
+
+    return progress;
   }
 }

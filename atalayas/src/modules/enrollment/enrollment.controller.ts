@@ -75,7 +75,7 @@ export class EnrollmentController {
     // 4. Corregimos el nombre al que pusimos en el Service: completeManualLesson
     return await this.enrollmentService.completeManualLesson(
       user.id,
-      completeDto.contentId,
+      completeDto.contentId!,
     );
   }
 
