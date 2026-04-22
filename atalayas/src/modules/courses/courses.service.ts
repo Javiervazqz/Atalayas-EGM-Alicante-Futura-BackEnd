@@ -3,18 +3,21 @@ import {
   ForbiddenException,
   NotFoundException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { User } from '@prisma/client';
 import { StorageService } from '../../infrastructure/storage/storage.service.js';
+import { AiService } from '../../infrastructure/ai/ai.service.js';
 
 @Injectable()
 export class CoursesService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
+    private readonly aiService: AiService,
   ) {}
 
   /**
@@ -55,7 +58,7 @@ export class CoursesService {
         companyId,
         isPublic: createCourseDto.isPublic || false,
         category: createCourseDto.category || 'BASICO',
-        fileUrl: fileUrl, // Aquí se guarda el https://...
+        fileUrl: fileUrl,
       },
     });
   }
