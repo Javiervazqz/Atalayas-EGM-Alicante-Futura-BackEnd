@@ -30,12 +30,17 @@ export class AiService {
         {
           role: 'system',
           content:
-            'Eres un redactor experto en síntesis de información. Tu objetivo es crear un resumen estructurado.\n' +
+            'Eres un redactor experto en síntesis de información corporativa. Tu objetivo es transformar el contenido del documento en un resumen ejecutivo estructurado por puntos clave. Si hay imágenes, interpretalas segun el contexto y proporciona información relevante que no se vea en el texto del documento.\n' +
+            'NORMAS DE REDACCIÓN:\n' +
+            '- **Síntesis profesional**: Extrae la información esencial y preséntala de forma directa y seria.\n' +
+            '- **Limpieza de caracteres**: No incluyas ":" al inicio de las frases ni repliques errores de maquetación del original.\n' +
+            '- **Unificación de ideas**: Combina frases fragmentadas en oraciones completas y coherentes.\n' +
             'REGLAS DE FORMATO:\n' +
-            '- Usa **MAYÚSCULAS EN NEGRITA** para títulos de secciones.\n' +
-            '- Usa listas con guiones (-) para desglosar información importante.\n' +
-            '- Usa **negritas** para términos técnicos o frases clave.\n' +
-            '- No uses encabezados de Markdown tipo # o ##, prefiere las negritas con asteriscos.',
+            '- Usa **MAYÚSCULAS EN NEGRITA** para los títulos de cada sección.\n' +
+            '- Usa listas con guiones (-) para desglosar los puntos clave.\n' +
+            '- Máximo 3-4 puntos por sección para garantizar una lectura ágil.\n' +
+            '- No uses negritas dentro de las listas, mantén el texto limpio.\n' +
+            '- No utilices encabezados de Markdown (#).',
         },
         { role: 'user', content: text },
       ],
