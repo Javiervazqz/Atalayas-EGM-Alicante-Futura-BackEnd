@@ -20,21 +20,15 @@ export class CoursesService {
     private readonly aiService: AiService,
   ) {}
 
-  /**
-   * CREAR CURSO
-   * Sube la imagen a Supabase y guarda la URL completa en la DB.
-   */
   async create(
     createCourseDto: CreateCourseDto,
     file: Express.Multer.File,
     requestUser: User,
   ) {
-    // 1. Validación de permisos
     if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear cursos');
     }
 
-    // 2. Determinar el companyId (Admin General puede asignar, Admin de empresa usa la suya)
     const companyId =
       requestUser.role === 'GENERAL_ADMIN' && createCourseDto.companyId
         ? createCourseDto.companyId
@@ -44,36 +38,28 @@ export class CoursesService {
       throw new ForbiddenException('Se requiere ID de empresa válido');
     }
 
-    // 3. Subida de archivo a Supabase (Drag & Drop desde PC)
     let fileUrl: string | null = null;
     if (file) {
-      // Tu StorageService ya retorna publicUrlData.publicUrl
       fileUrl = await this.storageService.uploadFile(file);
     }
 
-    // 4. Persistencia en base de datos
-    return await this.prismaService.course.create({
+    return this.prismaService.course.create({
       data: {
         title: createCourseDto.title,
         companyId,
         isPublic: createCourseDto.isPublic || false,
         category: createCourseDto.category || 'BASICO',
-        fileUrl: fileUrl,
+        fileUrl,
       },
     });
   }
 
-  /**
-   * ACTUALIZAR CURSO
-   * Si viene un archivo nuevo, borra el anterior y guarda la nueva URL.
-   */
   async update(
     id: string,
     updateCourseDto: UpdateCourseDto,
     requestUser: User,
     file?: Express.Multer.File,
   ) {
-    // 1. Verificar que el curso existe y el usuario tiene acceso
     const course = await this.findOne(id, requestUser);
 
     if (requestUser.role === 'EMPLOYEE') {
@@ -82,47 +68,40 @@ export class CoursesService {
 
     let fileUrl = course.fileUrl;
 
-    // 2. Gestionar nueva imagen si se sube desde el PC
     if (file) {
-      // Opcional: Borrar el archivo viejo de Supabase para no acumular basura
       if (course.fileUrl) {
         try {
           await this.storageService.deleteFile(course.fileUrl);
         } catch (error) {
           console.error('Error al borrar archivo viejo:', error);
-          // Continuamos aunque falle el borrado para no bloquear la actualización
         }
       }
-
-      // Subir el nuevo archivo y obtener URL completa
       fileUrl = await this.storageService.uploadFile(file);
     }
 
-    // 3. Actualizar en base de datos
     return this.prismaService.course.update({
       where: { id: course.id },
       data: {
         title: updateCourseDto.title,
         isPublic: updateCourseDto.isPublic,
         category: updateCourseDto.category,
-        fileUrl: fileUrl, // Se actualiza la URL o se mantiene la anterior
+        fileUrl,
       },
     });
   }
 
-  /**
-   * LISTAR CURSOS
-   */
   async findAll(requestUser: User) {
     if (requestUser.role === 'GENERAL_ADMIN') {
-      return await this.prismaService.course.findMany();
+      return this.prismaService.course.findMany();
     }
+
     if (requestUser.role === 'PUBLIC') {
-      return await this.prismaService.course.findMany({
+      return this.prismaService.course.findMany({
         where: { isPublic: true },
       });
     }
-    return await this.prismaService.course.findMany({
+
+    return this.prismaService.course.findMany({
       where: {
         OR: [{ companyId: requestUser.companyId }, { isPublic: true }],
       },
@@ -136,6 +115,7 @@ export class CoursesService {
       },
     });
   }
+
   async findOne(id: string, requestUser: User) {
     const course = await this.prismaService.course.findUnique({
       where: { id },
@@ -156,7 +136,6 @@ export class CoursesService {
       throw new NotFoundException(`El curso con ID ${id} no existe`);
     }
 
-    // Validación de acceso por empresa
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
       course.companyId !== requestUser.companyId &&
@@ -168,9 +147,6 @@ export class CoursesService {
     return course;
   }
 
-  /**
-   * ELIMINAR CURSO
-   */
   async remove(id: string, requestUser: User) {
     const course = await this.findOne(id, requestUser);
 
@@ -178,7 +154,6 @@ export class CoursesService {
       throw new ForbiddenException('No tienes permisos para eliminar cursos');
     }
 
-    // Borrar archivo de Supabase si existe
     if (course.fileUrl) {
       await this.storageService.deleteFile(course.fileUrl);
     }
@@ -201,57 +176,52 @@ export class CoursesService {
       throw new BadRequestException('Por favor, sube un archivo PDF válido.');
     }
 
-    console.log('📄 1. Extrayendo texto del PDF...');
-    // IMPORTANTE: Primero extraemos el texto usando el nuevo método de tu AiService
-    const extractedText = await this.aiService.extractTextFromPdf(
-      pdfFile.buffer,
-    );
+    // ✅ EXTRAER TEXTO REAL DEL PDF
+    const text = await this.aiService.extractTextFromPdf(pdfFile.buffer);
 
-    if (!extractedText || extractedText.trim().length === 0) {
-      throw new BadRequestException(
-        'No se pudo extraer texto del PDF o el archivo está vacío.',
-      );
-    }
+    const { script, audioBuffer } = await this.aiService.generatePodcast(text);
 
-    console.log('🎙️ 2. Generando guion y audio (Podcast)...');
-    // Ahora pasamos el TEXTO extraído, no el buffer del PDF
-    const { script, audioBuffer } =
-      await this.aiService.generatePodcast(extractedText);
-
-    console.log('🧠 3. Generando test interactivo...');
-    // Pasamos el script generado (que ya es un string limpio) para crear el quiz
-    const quizData: any = await this.aiService.generateQuiz(script);
+    console.log('🧠 Generando test interactivo...');
+    const quizData: QuizResult = await this.aiService.generateQuiz(script);
 
     const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
 
-    const audioFileMock = {
+    // ✅ CORRECCIÓN DEL ERROR DE TYPESCRIPT:
+    // Creamos un stream real a partir del buffer y usamos un cast para Multer
+    const audioFileMock: Express.Multer.File = {
       buffer: audioBuffer,
       originalname: fileName,
       mimetype: 'audio/mpeg',
-    } as Express.Multer.File;
+      fieldname: 'file',
+      encoding: '7bit',
+      size: audioBuffer.length,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      stream: Readable.from(audioBuffer) as any, // 👈 Se usa 'as any' para evitar el conflicto entre ReadableStream y Readable
+      destination: '',
+      filename: fileName,
+      path: '',
+    };
 
-    console.log('⏳ 4. Subiendo audio a Storage...');
+    console.log('⏳ Subiendo audio...');
     const audioUrl = await this.storageService.uploadFile(audioFileMock);
 
     console.log('🔥 5. Insertando en la base de datos...');
     try {
-      const nuevoContenido = await this.prismaService.content.create({
+      return await this.prismaService.content.create({
         data: {
-          title: title,
+          title,
           order: Number(order) || 1,
           courseId: course.id,
           summary: script, // Usamos el guion del podcast como resumen/texto del módulo
           url: audioUrl,
-          quiz: quizData,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          quiz: quizData as any,
         },
       });
-
-      console.log('🎉 ¡Proceso completado con éxito!');
-      return nuevoContenido;
-    } catch (dbError) {
-      console.error('🚨 Error de Prisma:', dbError);
+    } catch (error) {
+      console.error('🚨 ERROR AL INSERTAR:', error);
       throw new InternalServerErrorException(
-        'Error al guardar el contenido en la BD.',
+        'Error al guardar el contenido generado en la base de datos.',
       );
     }
   }
