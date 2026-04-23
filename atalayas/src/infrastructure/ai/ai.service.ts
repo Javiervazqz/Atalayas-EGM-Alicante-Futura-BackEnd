@@ -73,7 +73,6 @@ export class AiService {
   ): Promise<{ script: string; audioBuffer: Buffer }> {
     try {
       // 1. Generar el guion con Groq
-      // IMPORTANTE: Metemos todo dentro del TRY para que cualquier error sea capturado
       const completion = await this.aiClient.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [

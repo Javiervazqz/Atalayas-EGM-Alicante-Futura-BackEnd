@@ -201,45 +201,57 @@ export class CoursesService {
       throw new BadRequestException('Por favor, sube un archivo PDF válido.');
     }
 
-    const { script, audioBase64 } = await this.aiService.generatePodcastFromPdf(
+    console.log('📄 1. Extrayendo texto del PDF...');
+    // IMPORTANTE: Primero extraemos el texto usando el nuevo método de tu AiService
+    const extractedText = await this.aiService.extractTextFromPdf(
       pdfFile.buffer,
     );
 
-    console.log('🧠 Generando test interactivo a partir del resumen...');
-    const quizData: any = await this.aiService.generateQuizFromText(script);
+    if (!extractedText || extractedText.trim().length === 0) {
+      throw new BadRequestException(
+        'No se pudo extraer texto del PDF o el archivo está vacío.',
+      );
+    }
+
+    console.log('🎙️ 2. Generando guion y audio (Podcast)...');
+    // Ahora pasamos el TEXTO extraído, no el buffer del PDF
+    const { script, audioBuffer } =
+      await this.aiService.generatePodcast(extractedText);
+
+    console.log('🧠 3. Generando test interactivo...');
+    // Pasamos el script generado (que ya es un string limpio) para crear el quiz
+    const quizData: any = await this.aiService.generateQuiz(script);
 
     const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
+
     const audioFileMock = {
-      buffer: Buffer.from(audioBase64, 'base64'),
+      buffer: audioBuffer,
       originalname: fileName,
       mimetype: 'audio/mpeg',
     } as Express.Multer.File;
 
-    console.log('⏳ Subiendo audio a Storage...');
+    console.log('⏳ 4. Subiendo audio a Storage...');
     const audioUrl = await this.storageService.uploadFile(audioFileMock);
-    console.log('✅ Audio subido. URL:', audioUrl);
 
-    console.log('🔥 Intentando insertar en la tabla Content de Prisma...');
-
+    console.log('🔥 5. Insertando en la base de datos...');
     try {
       const nuevoContenido = await this.prismaService.content.create({
         data: {
           title: title,
           order: Number(order) || 1,
           courseId: course.id,
-          summary: script,
+          summary: script, // Usamos el guion del podcast como resumen/texto del módulo
           url: audioUrl,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           quiz: quizData,
         },
       });
 
-      console.log('🎉 ¡EXITO! Fila insertada en la BD:', nuevoContenido);
+      console.log('🎉 ¡Proceso completado con éxito!');
       return nuevoContenido;
     } catch (dbError) {
-      console.error('🚨 ERROR FATAL DE PRISMA AL INSERTAR:', dbError);
+      console.error('🚨 Error de Prisma:', dbError);
       throw new InternalServerErrorException(
-        'Prisma se ha negado a guardar en la base de datos.',
+        'Error al guardar el contenido en la BD.',
       );
     }
   }
