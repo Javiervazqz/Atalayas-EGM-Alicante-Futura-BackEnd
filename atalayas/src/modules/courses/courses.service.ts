@@ -2,24 +2,23 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
-  InternalServerErrorException,
-  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { User } from '@prisma/client';
 import { StorageService } from '../../infrastructure/storage/storage.service.js';
-import { AiService } from '../../infrastructure/ai/ai.service.js';
 
 @Injectable()
 export class CoursesService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
-    private readonly aiService: AiService,
   ) {}
 
+  /**
+   * Crea un nuevo curso y gestiona la subida del archivo de portada/recurso.
+   */
   async create(
     createCourseDto: CreateCourseDto,
     file: Express.Multer.File,
@@ -54,6 +53,9 @@ export class CoursesService {
     });
   }
 
+  /**
+   * Actualiza los datos del curso y reemplaza el archivo en storage si se sube uno nuevo.
+   */
   async update(
     id: string,
     updateCourseDto: UpdateCourseDto,
@@ -90,9 +92,14 @@ export class CoursesService {
     });
   }
 
+  /**
+   * Obtiene todos los cursos según el rol del usuario (Filtro por empresa o públicos).
+   */
   async findAll(requestUser: User) {
     if (requestUser.role === 'GENERAL_ADMIN') {
-      return this.prismaService.course.findMany();
+      return this.prismaService.course.findMany({
+        include: { Company: true },
+      });
     }
 
     if (requestUser.role === 'PUBLIC') {
@@ -116,6 +123,9 @@ export class CoursesService {
     });
   }
 
+  /**
+   * Obtiene un curso por ID con sus contenidos y progreso del usuario actual.
+   */
   async findOne(id: string, requestUser: User) {
     const course = await this.prismaService.course.findUnique({
       where: { id },
@@ -136,6 +146,7 @@ export class CoursesService {
       throw new NotFoundException(`El curso con ID ${id} no existe`);
     }
 
+    // Validación de permisos de acceso
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
       course.companyId !== requestUser.companyId &&
@@ -147,6 +158,9 @@ export class CoursesService {
     return course;
   }
 
+  /**
+   * Elimina un curso y su archivo asociado en el storage.
+   */
   async remove(id: string, requestUser: User) {
     const course = await this.findOne(id, requestUser);
 
@@ -155,74 +169,15 @@ export class CoursesService {
     }
 
     if (course.fileUrl) {
-      await this.storageService.deleteFile(course.fileUrl);
+      try {
+        await this.storageService.deleteFile(course.fileUrl);
+      } catch (error) {
+        console.error('Error al borrar archivo adjunto:', error);
+      }
     }
 
     return this.prismaService.course.delete({
       where: { id: course.id },
     });
-  }
-
-  async generateContentWithAi(
-    courseId: string,
-    title: string,
-    order: number,
-    pdfFile: Express.Multer.File,
-    requestUser: User,
-  ) {
-    const course = await this.findOne(courseId, requestUser);
-
-    if (!pdfFile || pdfFile.mimetype !== 'application/pdf') {
-      throw new BadRequestException('Por favor, sube un archivo PDF válido.');
-    }
-
-    // ✅ EXTRAER TEXTO REAL DEL PDF
-    const text = await this.aiService.extractTextFromPdf(pdfFile.buffer);
-
-    const { script, audioBuffer } = await this.aiService.generatePodcast(text);
-
-    console.log('🧠 Generando test interactivo...');
-    const quizData: QuizResult = await this.aiService.generateQuiz(script);
-
-    const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
-
-    // ✅ CORRECCIÓN DEL ERROR DE TYPESCRIPT:
-    // Creamos un stream real a partir del buffer y usamos un cast para Multer
-    const audioFileMock: Express.Multer.File = {
-      buffer: audioBuffer,
-      originalname: fileName,
-      mimetype: 'audio/mpeg',
-      fieldname: 'file',
-      encoding: '7bit',
-      size: audioBuffer.length,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      stream: Readable.from(audioBuffer) as any, // 👈 Se usa 'as any' para evitar el conflicto entre ReadableStream y Readable
-      destination: '',
-      filename: fileName,
-      path: '',
-    };
-
-    console.log('⏳ Subiendo audio...');
-    const audioUrl = await this.storageService.uploadFile(audioFileMock);
-
-    console.log('🔥 5. Insertando en la base de datos...');
-    try {
-      return await this.prismaService.content.create({
-        data: {
-          title,
-          order: Number(order) || 1,
-          courseId: course.id,
-          summary: script, // Usamos el guion del podcast como resumen/texto del módulo
-          url: audioUrl,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          quiz: quizData as any,
-        },
-      });
-    } catch (error) {
-      console.error('🚨 ERROR AL INSERTAR:', error);
-      throw new InternalServerErrorException(
-        'Error al guardar el contenido generado en la base de datos.',
-      );
-    }
   }
 }

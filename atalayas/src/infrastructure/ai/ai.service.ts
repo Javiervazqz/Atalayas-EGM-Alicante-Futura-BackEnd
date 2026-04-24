@@ -42,7 +42,7 @@ export class AiService {
         {
           role: 'system',
           content:
-            'Eres un redactor experto en síntesis de información corporativa. Tu objetivo es transformar el contenido del documento en un resumen ejecutivo estructurado por puntos clave. Si hay imágenes, interpretalas segun el contexto y proporciona información relevante que no se vea en el texto del documento.\n' +
+            'Eres un redactor experto en síntesis de información corporativa. Tu objetivo es transformar el contenido del documento en un resumen ejecutivo estructurado por puntos clave. Si hay imágenes, interpretalas segun el contexto y proporciona información relevante que no se vea en el texto del documento. No empieces por Introducción a Atalayas.\n' +
             'NORMAS DE REDACCIÓN:\n' +
             '- **Síntesis profesional**: Extrae la información esencial y preséntala de forma directa y seria.\n' +
             '- **Limpieza de caracteres**: No incluyas ":" al inicio de las frases ni repliques errores de maquetación del original.\n' +
@@ -68,29 +68,31 @@ export class AiService {
         {
           role: 'system',
           content:
-            'Genera un test de 4 preguntas y devuelve SOLO JSON con formato {"questions":[...]}',
+            'Eres un generador de cuestionarios educativos. Tu tarea es devolver exclusivamente un objeto JSON. ' +
+            'No incluyas texto explicativo, solo el JSON puro. ' +
+            'ESTRUCTURA DEL JSON: {"questions": [{"question": "texto", "options": ["op1", "op2", "op3", "op4"], "correctAnswer": "op1"}]} ' +
+            'Asegúrate de que la correctAnswer coincida exactamente con una de las opciones.',
         },
-        { role: 'user', content: text },
+        {
+          role: 'user',
+          content: `Genera un cuestionario de 4 preguntas basado en el siguiente texto: ${text}`,
+        },
       ],
       response_format: { type: 'json_object' },
+      temperature: 0.2, // Bajamos la temperatura para mayor precisión en el formato
     });
 
     const content = completion.choices[0].message.content || '{}';
 
-    let parsed: unknown;
-
     try {
-      parsed = JSON.parse(content);
-    } catch {
-      parsed = {};
-    }
+      const parsed = JSON.parse(content);
 
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'questions' in parsed
-    ) {
-      return parsed as QuizResult;
+      // Validación de seguridad adicional
+      if (parsed.questions && Array.isArray(parsed.questions)) {
+        return parsed as QuizResult;
+      }
+    } catch (e) {
+      console.error('Error parseando el JSON de Groq:', e);
     }
 
     return { questions: [] };
