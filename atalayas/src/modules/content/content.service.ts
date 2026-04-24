@@ -154,6 +154,9 @@ export class ContentService {
   }
 
   async findOne(id: string, requestUser: User) {
+
+      await this.ensureUserProgress(requestUser.id, id);
+
     // Eliminamos los console.log de depuración para producción
     const content = await this.prisma.content.findUnique({
       where: { id },
@@ -242,6 +245,8 @@ export class ContentService {
 
     const isPerfectScore = data.score === data.totalQuestions;
 
+    await this.ensureUserProgress(requestUser.id, contentId);
+
     const progress = await this.prisma.userProgress.upsert({
       where: {
         userId_contentId: {
@@ -268,5 +273,23 @@ export class ContentService {
     }
 
     return progress;
+  }
+  private async ensureUserProgress(userId: string, contentId: string) {
+    const exists = await this.prisma.userProgress.findUnique({
+      where: {
+        userId_contentId: { userId, contentId },
+      },
+    });
+
+    if (!exists) {
+      await this.prisma.userProgress.create({
+        data: {
+          userId,
+          contentId,
+          isCompleted: false,
+          lastTime: 0,
+        },
+      });
+    }
   }
 }

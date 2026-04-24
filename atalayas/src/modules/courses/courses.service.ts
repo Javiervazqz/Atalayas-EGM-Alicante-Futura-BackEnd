@@ -17,9 +17,9 @@ export class CoursesService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
-        private readonly aiService: AiService,
-
-  ) {}
+    private readonly aiService: AiService
+  ) 
+  {}
 
   /**
    * CREAR CURSO
@@ -205,10 +205,9 @@ export class CoursesService {
     const { script, audioBuffer } = await this.aiService.generatePodcastFromPdf(
       pdfFile,
     );
-
     const audioBase64 = audioBuffer.toString('base64');
 
-    console.log('🧠 Generando test interactivo a partir del resumen...');
+    console.log('Generando test interactivo a partir del resumen...');
     const quizData: any = await this.aiService.generateQuiz(script);
 
     const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
@@ -218,11 +217,12 @@ export class CoursesService {
       mimetype: 'audio/mpeg',
     } as Express.Multer.File;
 
-    console.log('⏳ Subiendo audio a Storage...');
+    console.log('Subiendo audio a Storage...');
     const audioUrl = await this.storageService.uploadFile(audioFileMock);
-    console.log('✅ Audio subido. URL:', audioUrl);
+    console.log('Audio subido. URL:', audioUrl);
 
-    console.log('🔥 Intentando insertar en la tabla Content de Prisma...');
+    console.log('Intentando insertar en la tabla Content de Prisma...');
+    
 
     try {
       const nuevoContenido = await this.prismaService.content.create({
