@@ -533,6 +533,7 @@ model User {
   resetTokenExp    DateTime?
   onboardingDone   Boolean            @default(false)
   firstLoginAt     DateTime?          @db.Timestamptz(6)
+  jobRole          String             @default("No asignado")
   Document         Document[]
   Enrollment       Enrollment[]
   Suggestion       Suggestion[]
