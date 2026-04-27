@@ -701,7 +701,7 @@ model Suggestion {
   targetRole  Role
   companyId   String?          @db.Uuid
   createdAt   DateTime         @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime         @updatedAt
   response    String?
   respondedAt DateTime?
   User        User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
