@@ -81,6 +81,7 @@ export class AuthService {
         email: data.user.email,
         role: publicUser.role,
         name: publicUser.name,
+        jobRole: publicUser.jobRole,
         companyId: publicUser.companyId,
         Company: publicUser.Company,
         avatarUrl: publicUser.avatarUrl,
@@ -101,6 +102,7 @@ export class AuthService {
         name: dto.name,
         role: dto.role, // Importante para el JWT
         companyId: dto.companyId,
+        jobRole: dto.jobRole,
       },
     });
 
@@ -117,6 +119,7 @@ export class AuthService {
           // Validamos el rol para que coincida con tu Enum de Prisma
           role: (dto.role as Role) || Role.EMPLOYEE,
           companyId: dto.companyId || null,
+          jobRole: dto.jobRole,
         },
       });
     } catch (err) {
@@ -142,6 +145,7 @@ export class AuthService {
           name: registerDto.email.split('@')[0], // Asigna el nombre por defecto como la parte antes del @ del email
           role: Role.PUBLIC,
           companyId: null,
+          jobRole: 'No asignado',
         },
       });
 
@@ -183,6 +187,7 @@ export class AuthService {
           name: authUser.email!.split('@')[0],
           role: Role.PUBLIC,
           companyId: null,
+          jobRole: 'No asignado',
         },
       });
     }

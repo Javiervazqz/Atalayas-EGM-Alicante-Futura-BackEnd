@@ -64,6 +64,7 @@ export class UsersService {
       name: createUserDto.name,
       role: finalRole,
       companyId: finalCompanyId,
+      jobRole: createUserDto.jobRole,
     });
     // Retornamos la password provisional SOLO UNA VEZ para que el admin la vea
     return {
