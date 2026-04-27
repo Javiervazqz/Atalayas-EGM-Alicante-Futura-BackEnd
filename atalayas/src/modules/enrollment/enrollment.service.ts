@@ -70,7 +70,7 @@ export class EnrollmentService {
 
   async findAll(requestUser: User) {
     // GENERAL_ADMIN: Lo ve todo
-    if (requestUser.role === 'GENERAL_ADMIN') {
+   /*  if (requestUser.role === 'GENERAL_ADMIN') {
       return this.prisma.enrollment.findMany({
         include: { User: true, Course: true },
       });
@@ -83,12 +83,39 @@ export class EnrollmentService {
         include: { User: true, Course: true },
       });
     }
-
     // EMPLOYEE: Solo ve SUS propias matriculaciones
     return this.prisma.enrollment.findMany({
       where: { userId: requestUser.id },
       include: { User: true, Course: true },
-    });
+    });*/
+
+    const courses = await this.prisma.course.findMany({
+    where: {
+      OR: [
+        { isPublic: true },
+        { companyId: requestUser.companyId },
+      ],
+    },
+    include: {
+      Enrollment: {
+        where: {
+          userId: requestUser.id,
+        },
+      },
+    },
+  });
+
+  // 👇 Aplanamos los datos
+  return courses.map(course => {
+    const enrollment = course.Enrollment[0];
+
+    return {
+      ...course,
+      progress: enrollment ? enrollment.progress : 0,
+      isCompleted: enrollment ? enrollment.progress === 100 : false,
+    };
+  });
+
   }
 
   async findOne(id: string, requestUser: User) {

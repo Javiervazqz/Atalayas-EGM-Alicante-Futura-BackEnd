@@ -18,8 +18,7 @@ export class CoursesService {
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
     private readonly aiService: AiService
-  ) 
-  {}
+  ) { }
 
   /**
    * CREAR CURSO
@@ -157,6 +156,14 @@ export class CoursesService {
       throw new NotFoundException(`El curso con ID ${id} no existe`);
     }
 
+    const contentWithProgress = course.Content.map(c => ({
+      ...c,
+      isCompleted:
+        c.userProgresses.length > 0
+          ? c.userProgresses[0].isCompleted
+          : false,
+    }));
+
     // Validación de acceso por empresa
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
@@ -166,7 +173,10 @@ export class CoursesService {
       throw new ForbiddenException('No tienes permisos para ver este curso');
     }
 
-    return course;
+    return {
+      ...course,
+      Content: contentWithProgress,
+    };
   }
 
   /**
@@ -222,7 +232,7 @@ export class CoursesService {
     console.log('Audio subido. URL:', audioUrl);
 
     console.log('Intentando insertar en la tabla Content de Prisma...');
-    
+
 
     try {
       const nuevoContenido = await this.prismaService.content.create({

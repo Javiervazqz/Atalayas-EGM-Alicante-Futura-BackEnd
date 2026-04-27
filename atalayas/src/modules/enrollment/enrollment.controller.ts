@@ -44,7 +44,7 @@ export class EnrollmentController {
   @ApiOperation({
     summary: 'Ver matriculaciones (Admins ven su empresa, Empleados las suyas)',
   })
-  findAll(@Req() req: Request & { user: User }) {
+  findAll(@Req() req) {
     return this.enrollmentService.findAll(req.user);
   }
 
