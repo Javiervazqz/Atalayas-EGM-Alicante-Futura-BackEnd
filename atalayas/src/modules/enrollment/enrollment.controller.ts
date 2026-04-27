@@ -78,6 +78,13 @@ export class EnrollmentController {
       completeDto.contentId!,
     );
   }
+  @Post('content-access')
+  async markOnAccess(
+  @GetUser() user: User,
+  @Body('contentId') contentId: string,
+) {
+  return this.enrollmentService.markContentOnAccess(user.id, contentId);
+}
 
   // ⬇️ RUTAS DINÁMICAS (CON :id) DESPUÉS ⬇️
 

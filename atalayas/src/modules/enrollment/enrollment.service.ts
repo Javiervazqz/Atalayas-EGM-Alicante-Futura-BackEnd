@@ -280,4 +280,38 @@ export class EnrollmentService {
       });
     }
   }
+
+  async markContentOnAccess(userId: string, contentId: string) {
+  const content = await this.prisma.content.findUnique({
+    where: { id: contentId },
+  });
+
+  if (!content) {
+    throw new NotFoundException('Contenido no encontrado');
+  }
+
+  const hasQuiz = content.quiz && content.quiz !== 'null';
+
+  // 👉 Si TIENE quiz → NO completar automáticamente
+  if (hasQuiz) {
+    return;
+  }
+
+  // 👉 Si NO tiene quiz → marcar como completado
+  await this.prisma.userProgress.upsert({
+    where: { userId_contentId: { userId, contentId } },
+    update: {
+      isCompleted: true,
+      completedAt: new Date(),
+    },
+    create: {
+      userId,
+      contentId,
+      isCompleted: true,
+      completedAt: new Date(),
+    },
+  });
+
+  return await this.syncEnrollmentProgress(userId, contentId);
+}
 }
