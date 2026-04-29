@@ -164,12 +164,16 @@ export class AiService {
           {
             role: 'system',
             content:
-              'Eres un director de arte especializado en diseño gráfico corporativo minimalista. ' +
-              'Tu tarea es leer extractos de documentos y crear un PROMPT VISUAL en INGLÉS. ' +
-              'REGLAS ESTRICTAS DE ESTILO: Modern corporate flat design illustration, minimalist vector art, SVG style. ' +
-              'PALETA DE COLORES: Strict use of corporate blue tones, white background, no gradients. ' +
-              'COMPOSICIÓN: Centered flat object or simple scene. Abstract geometric shapes. NO HUMAN BEINGS, NO FACES, NO HANDS. ' +
-              'IMPORTANTE: No incluyas texto, logotipos o letras dentro de la imagen. Solo elementos visuales geométricos y limpios.',
+              'You are a professional commercial photographer and art director. ' +
+              'Analyze the document text to identify the most iconic and professional physical object that represents its core theme. ' +
+              'Convert that specific subject into a HIGH-END PHOTOGRAPHIC visual prompt. ' +
+              'STYLE: Professional laboratory and university photography, shot on 35mm lens, f/2.8. ' +
+              'LIGHTING: Cinematic natural light, soft shadows, clear high-key faculty atmosphere. ' +
+              'COMPOSITION: Sharp focus on the identified subject in the foreground, beautiful blurred background (bokeh) reflecting the professional scientific setting. ' +
+              'DETAILS: Photorealistic textures, glass, brushed metal, safety equipment, or universal warning symbols. ' +
+              'PALETTE: Clean whites, corporate blues, and safety yellow or red accent tones. ' +
+              'RESTRICTIONS: NO TEXT, NO ALPHANUMERIC CHARACTERS, NO BRAND LOGOS, NO DISTORTED FACES. ' +
+              'Output ONLY the English prompt.',
           },
           // Pasamos un subconjunto del texto para no saturar el prompt
           {
