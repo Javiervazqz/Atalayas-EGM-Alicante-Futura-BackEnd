@@ -11,7 +11,7 @@ type QuizQuestion = {
 
 type PodcastResult = {
   script: string;
-  audioBase64: string;
+  audioBuffer: Buffer;
 };
 
 @Injectable()
@@ -71,7 +71,9 @@ export class AiService {
         .replace(/```/g, '')
         .trim();
 
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(content) as
+        | { questions?: QuizQuestion[] }
+        | QuizQuestion[];
       // Si el modelo envuelve el array en un objeto { "questions": [...] }
       return Array.isArray(parsed) ? parsed : parsed.questions || [];
     } catch (error) {
@@ -117,9 +119,7 @@ export class AiService {
 
       return {
         script: cleanScript,
-        audioBase64: Buffer.from(audioResponse.data as ArrayBuffer).toString(
-          'base64',
-        ),
+        audioBuffer: Buffer.from(audioResponse.data as ArrayBuffer),
       };
     } catch (error: any) {
       console.error('🚨 Error en Podcast Pipeline:', error);

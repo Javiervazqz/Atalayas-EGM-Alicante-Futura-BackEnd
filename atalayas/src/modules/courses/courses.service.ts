@@ -170,23 +170,6 @@ export class CoursesService {
     return course;
   }
 
-  async update(
-    id: string,
-    updateCourseDto: UpdateCourseDto,
-    requestUser: User,
-  ) {
-    const course = await this.findOne(id, requestUser);
-
-    if (requestUser.role === 'EMPLOYEE') {
-      throw new ForbiddenException('No tienes permisos para actualizar cursos');
-    }
-
-    return this.prismaService.course.update({
-      where: { id: course.id },
-      data: updateCourseDto,
-    });
-  }
-
   async remove(id: string, requestUser: User) {
     const course = await this.findOne(id, requestUser);
 
@@ -222,10 +205,11 @@ export class CoursesService {
       throw new BadRequestException('Por favor, sube un archivo PDF válido.');
     }
 
+    const rawText = await this.aiService.extractTextFromPdf(pdfFile.buffer);
+
     // 2. Pasamos el PDF a nuestro AiService para que haga la magia (DeepSeek + ElevenLabs)
-    const { script, audioBase64 } = await this.aiService.generatePodcastFromPdf(
-      pdfFile.buffer,
-    );
+    const { script, audioBuffer } =
+      await this.aiService.generatePodcast(rawText);
 
     // 🚀 2.5 NUEVO: Generamos el Test interactivo usando el resumen que acaba de crear
     console.log('🧠 Generando test interactivo a partir del resumen...');
@@ -234,7 +218,7 @@ export class CoursesService {
     // 3. Preparamos el archivo de audio para subirlo a Supabase
     const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
     const audioFileMock = {
-      buffer: Buffer.from(audioBase64, 'base64'),
+      buffer: audioBuffer,
       originalname: fileName,
       mimetype: 'audio/mpeg',
     } as Express.Multer.File;

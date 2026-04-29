@@ -22,6 +22,7 @@ export class ContentService {
     createContentDto: CreateContentDto,
     requestUser: User,
     courseId: string,
+    file?: Express.Multer.File,
   ) {
     console.log('courseId:', courseId);
     console.log('requestUser:', requestUser);
@@ -29,10 +30,9 @@ export class ContentService {
     if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
-    file?: Express.Multer.File,
-  ) {
     // 1. Validaciones de permisos
-    if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
+    const rolesProhibidos = ['EMPLOYEE', 'PUBLIC'];
+    if (rolesProhibidos.includes(requestUser.role)) {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
 
@@ -101,7 +101,7 @@ export class ContentService {
         if (options.generateQuiz) {
           tasks.push(
             this.aiService
-              .generateQuiz(rawText)
+              .generateQuizFromText(rawText)
               .then((res) => (quizData = res)),
           );
         }
@@ -138,10 +138,10 @@ export class ContentService {
     const dataToSave = {
       title: createContentDto.title,
       courseId: courseId,
-      url: finalUrl,
+      url: finalUrl ?? undefined,
       summary: summary,
-      quiz: quizData ? (quizData as any) : null,
-      podcast: podcastData ? (podcastData as any) : null, // Forzamos el guardado del objeto
+      quiz: quizData ?? undefined,
+      podcast: podcastData ?? undefined,
       order: nextOrder,
     };
 
@@ -242,8 +242,6 @@ export class ContentService {
         'No tienes permisos para actualizar contenido de este curso',
       );
     }
-    if (requestUser.role === 'EMPLOYEE')
-      throw new ForbiddenException('Sin permisos');
 
     return this.prisma.content.update({
       where: { id },
@@ -253,23 +251,21 @@ export class ContentService {
 
   async remove(id: string, requestUser: User) {
     const content = await this.findOne(id, requestUser);
-    if (requestUser.role === 'EMPLOYEE') {
+    const role = requestUser.role as string;
+
+    if (role === 'EMPLOYEE') {
       throw new ForbiddenException(
         'No tienes permisos para eliminar contenido',
       );
     }
     if (
-      requestUser.role === 'ADMIN' &&
+      role === 'ADMIN' &&
       content.Course.companyId !== requestUser.companyId
     ) {
       throw new ForbiddenException(
         'No tienes permisos para eliminar contenido de este curso',
       );
     }
-    return this.prisma.content.delete({
-      where: { id },
-    if (requestUser.role === 'EMPLOYEE')
-      throw new ForbiddenException('Sin permisos');
 
     return this.prisma.content.delete({ where: { id } });
   }
