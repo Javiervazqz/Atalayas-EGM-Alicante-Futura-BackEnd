@@ -25,4 +25,13 @@ export class CreateCourseDto {
   @IsString()
   @IsOptional()
   category?: string;
+
+  @ApiProperty({
+    type: 'string',
+    format: 'binary',
+    required: false,
+    description: 'Archivo PDF del curso',
+  })
+  @IsOptional()
+  file?: any;
 }

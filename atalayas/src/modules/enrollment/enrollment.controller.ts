@@ -16,8 +16,9 @@ import { CreateEnrollmentDto } from './dto/create-enrollment.dto.js';
 import { UpdateEnrollmentDto } from './dto/update-enrollment.dto.js';
 import { Request } from 'express';
 import { GetUser } from '../../common/decorators/get-user.decorator.js';
-
 import { AuthGuard } from '../../common/guards/auth.guard.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
 import type { User } from '@prisma/client';
 import { UpdateVideoProgressDto } from './dto/update-video-progress.dto.js';
 import { CompleteManualLessonDto } from './dto/complete-manual-lesson.dto.js';
@@ -40,10 +41,24 @@ export class EnrollmentController {
     return this.enrollmentService.create(createEnrollmentDto, req.user);
   }
 
+  // ── MATRICULACIÓN MASIVA ──────────────────────────────────────────────────
+  @Post('bulk')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GENERAL_ADMIN')
+  @ApiOperation({ summary: 'Matricular múltiples usuarios en un curso' })
+  bulkEnroll(
+    @Body() dto: { userIds: string[]; courseId: string },
+    @Req() req: Request & { user: User },
+  ) {
+    return this.enrollmentService.bulkEnroll(
+      dto.userIds,
+      dto.courseId,
+      req.user,
+    );
+  }
+
   @Get()
-  @ApiOperation({
-    summary: 'Ver matriculaciones (Admins ven su empresa, Empleados las suyas)',
-  })
+  @ApiOperation({ summary: 'Ver matriculaciones' })
   findAll(@Req() req: Request & { user: User }) {
     return this.enrollmentService.findAll(req.user);
   }

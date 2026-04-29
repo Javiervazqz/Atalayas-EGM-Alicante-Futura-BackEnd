@@ -13,7 +13,7 @@ export class OnboardingService {
       const createdSteps: OnboardingStep[] = [];
 
       for (const step of steps) {
-        // 1. Upsert del Paso
+        // 1. Upsert del Paso (si existe el día en esa empresa, actualiza; si no, crea)
         const updatedStep = await tx.onboardingStep.upsert({
           where: {
             companyId_day: { companyId, day: step.day },

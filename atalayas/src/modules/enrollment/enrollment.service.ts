@@ -227,4 +227,63 @@ export class EnrollmentService {
       },
     });
   }
+
+  // ── MATRICULACIÓN MASIVA ─────────────────────────────────────────────────
+  async bulkEnroll(userIds: string[], courseId: string, requestUser: User) {
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException('Sin permisos para matriculación masiva');
+    }
+    if (!userIds?.length) {
+      throw new BadRequestException('Debes seleccionar al menos un usuario');
+    }
+
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
+    if (!course) throw new NotFoundException('Curso no encontrado');
+
+    if (
+      requestUser.role !== 'GENERAL_ADMIN' &&
+      course.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException('El curso no pertenece a tu empresa');
+    }
+
+    const results = { enrolled: 0, skipped: 0, errors: [] as string[] };
+
+    for (const userId of userIds) {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
+        if (!user) {
+          results.errors.push(`Usuario ${userId} no existe`);
+          continue;
+        }
+
+        if (
+          requestUser.role !== 'GENERAL_ADMIN' &&
+          user.companyId !== requestUser.companyId
+        ) {
+          results.errors.push(`Usuario ${userId} no pertenece a tu empresa`);
+          continue;
+        }
+
+        const exists = await this.prisma.enrollment.findFirst({
+          where: { userId, courseId },
+        });
+        if (exists) {
+          results.skipped++;
+          continue;
+        }
+
+        await this.prisma.enrollment.create({ data: { userId, courseId } });
+        results.enrolled++;
+      } catch {
+        results.errors.push(`Error con usuario ${userId}`);
+      }
+    }
+
+    return results;
+  }
 }

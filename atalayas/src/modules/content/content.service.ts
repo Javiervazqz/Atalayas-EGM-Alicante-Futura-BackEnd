@@ -24,8 +24,15 @@ export class ContentService {
     courseId: string,
     file?: Express.Multer.File,
   ) {
-    // 1. Validaciones de permisos
+    console.log('courseId:', courseId);
+    console.log('requestUser:', requestUser);
+    console.log('createContentDto:', createContentDto);
     if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
+      throw new ForbiddenException('No tienes permisos para crear contenido');
+    }
+    // 1. Validaciones de permisos
+    const rolesProhibidos = ['EMPLOYEE', 'PUBLIC'];
+    if (rolesProhibidos.includes(requestUser.role)) {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
 
@@ -35,6 +42,15 @@ export class ContentService {
 
     if (!courseExists) {
       throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
+    }
+
+    if (
+      requestUser.role === 'ADMIN' &&
+      courseExists.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException(
+        `No tienes permisos para agregar contenido a este curso.`,
+      );
     }
 
     // 2. Parsear opciones de IA
@@ -85,7 +101,7 @@ export class ContentService {
         if (options.generateQuiz) {
           tasks.push(
             this.aiService
-              .generateQuiz(rawText)
+              .generateQuizFromText(rawText)
               .then((res) => (quizData = res)),
           );
         }
@@ -122,10 +138,10 @@ export class ContentService {
     const dataToSave = {
       title: createContentDto.title,
       courseId: courseId,
-      url: finalUrl,
+      url: finalUrl ?? undefined,
       summary: summary,
-      quiz: quizData ? (quizData as any) : null,
-      podcast: podcastData ? (podcastData as any) : null, // Forzamos el guardado del objeto
+      quiz: quizData ?? undefined,
+      podcast: podcastData ?? undefined,
       order: nextOrder,
     };
 
@@ -136,6 +152,9 @@ export class ContentService {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
+    if (!course) {
+      throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
+    }
     if (!course) throw new NotFoundException(`Curso no encontrado`);
 
     if (
@@ -144,10 +163,10 @@ export class ContentService {
     ) {
       throw new ForbiddenException(`No tienes acceso al curso.`);
     }
-
     return this.prisma.content.findMany({
       where: { courseId },
       orderBy: { order: 'asc' },
+      include: { Course: true }, // Traemos la información del curso al que pertenece cada contenido
     });
   }
 
@@ -157,6 +176,7 @@ export class ContentService {
       where: { id },
       include: {
         Course: true,
+        // 🚀 AQUÍ ESTÁ EL CAMBIO: Traemos el progreso solo de este usuario
         // 1. Incluimos el progreso del usuario que hace la petición
         userProgresses: {
           where: {
@@ -209,8 +229,19 @@ export class ContentService {
     requestUser: User,
   ) {
     const content = await this.findOne(id, requestUser);
-    if (requestUser.role === 'EMPLOYEE')
-      throw new ForbiddenException('Sin permisos');
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException(
+        'No tienes permisos para actualizar contenido',
+      );
+    }
+    if (
+      requestUser.role === 'ADMIN' &&
+      content.Course.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para actualizar contenido de este curso',
+      );
+    }
 
     return this.prisma.content.update({
       where: { id },
@@ -220,8 +251,21 @@ export class ContentService {
 
   async remove(id: string, requestUser: User) {
     const content = await this.findOne(id, requestUser);
-    if (requestUser.role === 'EMPLOYEE')
-      throw new ForbiddenException('Sin permisos');
+    const role = requestUser.role as string;
+
+    if (role === 'EMPLOYEE') {
+      throw new ForbiddenException(
+        'No tienes permisos para eliminar contenido',
+      );
+    }
+    if (
+      role === 'ADMIN' &&
+      content.Course.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para eliminar contenido de este curso',
+      );
+    }
 
     return this.prisma.content.delete({ where: { id } });
   }

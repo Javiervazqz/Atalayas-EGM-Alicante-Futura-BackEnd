@@ -2,23 +2,24 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
+import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { User } from '@prisma/client';
+import { AiService } from '../../infrastructure/ai/ai.service.js';
 import { StorageService } from '../../infrastructure/storage/storage.service.js';
 
 @Injectable()
 export class CoursesService {
   constructor(
     private readonly prismaService: PrismaService,
+    private readonly aiService: AiService,
     private readonly storageService: StorageService,
   ) {}
 
-  /**
-   * Crea un nuevo curso y gestiona la subida del archivo de portada/recurso.
-   */
   async create(
     createCourseDto: CreateCourseDto,
     file: Express.Multer.File,
@@ -32,17 +33,28 @@ export class CoursesService {
       requestUser.role === 'GENERAL_ADMIN' && createCourseDto.companyId
         ? createCourseDto.companyId
         : requestUser.companyId;
-
     if (!companyId) {
       throw new ForbiddenException('Se requiere ID de empresa válido');
     }
 
+    // 🛡️ Regla de seguridad: Solo GENERAL_ADMIN puede hacer cursos públicos
+    if (requestUser.role !== 'GENERAL_ADMIN' && createCourseDto.isPublic) {
+      throw new ForbiddenException(
+        'Solo administradores generales pueden crear cursos públicos',
+      );
+    }
+
     let fileUrl: string | null = null;
+
     if (file) {
+      // Usamos directamente el 'file' que viene de Multer,
+      // storageService ya debería encargarse del resto.
       fileUrl = await this.storageService.uploadFile(file);
     }
 
-    return this.prismaService.course.create({
+    return await this.prismaService.course.create({
+      // ... resto de tu lógica de creación
+
       data: {
         title: createCourseDto.title,
         companyId,
@@ -158,9 +170,6 @@ export class CoursesService {
     return course;
   }
 
-  /**
-   * Elimina un curso y su archivo asociado en el storage.
-   */
   async remove(id: string, requestUser: User) {
     const course = await this.findOne(id, requestUser);
 
@@ -179,5 +188,68 @@ export class CoursesService {
     return this.prismaService.course.delete({
       where: { id: course.id },
     });
+  }
+
+  // 🚀 MÉTODO PARA LA IA (CON GENERACIÓN DE QUIZ INCLUIDA)
+  async generateContentWithAi(
+    courseId: string,
+    title: string,
+    order: number,
+    pdfFile: Express.Multer.File,
+    requestUser: User,
+  ) {
+    // 1. Verificamos que el curso existe y el usuario tiene permisos
+    const course = await this.findOne(courseId, requestUser);
+
+    if (!pdfFile || pdfFile.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Por favor, sube un archivo PDF válido.');
+    }
+
+    const rawText = await this.aiService.extractTextFromPdf(pdfFile.buffer);
+
+    // 2. Pasamos el PDF a nuestro AiService para que haga la magia (DeepSeek + ElevenLabs)
+    const { script, audioBuffer } =
+      await this.aiService.generatePodcast(rawText);
+
+    // 🚀 2.5 NUEVO: Generamos el Test interactivo usando el resumen que acaba de crear
+    console.log('🧠 Generando test interactivo a partir del resumen...');
+    const quizData: any = await this.aiService.generateQuizFromText(script);
+
+    // 3. Preparamos el archivo de audio para subirlo a Supabase
+    const fileName = `curso_${course.id}_modulo_${Date.now()}.mp3`;
+    const audioFileMock = {
+      buffer: audioBuffer,
+      originalname: fileName,
+      mimetype: 'audio/mpeg',
+    } as Express.Multer.File;
+
+    console.log('⏳ Subiendo audio a Storage...');
+    const audioUrl = await this.storageService.uploadFile(audioFileMock);
+    console.log('✅ Audio subido. URL:', audioUrl);
+
+    // 4. GUARDADO EN BASE DE DATOS
+    console.log('🔥 Intentando insertar en la tabla Content de Prisma...');
+
+    try {
+      const nuevoContenido = await this.prismaService.content.create({
+        data: {
+          title: title,
+          order: Number(order) || 1,
+          courseId: course.id,
+          summary: script,
+          url: audioUrl,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          quiz: quizData, // 👈 ¡MAGIA! Guardamos el JSON del test aquí
+        },
+      });
+
+      console.log('🎉 ¡EXITO! Fila insertada en la BD:', nuevoContenido);
+      return nuevoContenido;
+    } catch (dbError) {
+      console.error('🚨 ERROR FATAL DE PRISMA AL INSERTAR:', dbError);
+      throw new InternalServerErrorException(
+        'Prisma se ha negado a guardar en la base de datos.',
+      );
+    }
   }
 }

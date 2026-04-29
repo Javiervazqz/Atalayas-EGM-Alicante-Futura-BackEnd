@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { MailerService } from '@nestjs-modules/mailer';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { StorageService } from '../../infrastructure/storage/storage.service';
+import { Company } from '../company/entities/company.entity';
 
 @Injectable()
 export class AuthService {

@@ -474,6 +474,7 @@ model Company {
   OnboardingStep OnboardingStep[]
   Service        Service[]
   Suggestion     Suggestion[]
+  Announcement   Announcement[]
   User           User[]
 
   @@schema("public")
@@ -558,6 +559,7 @@ model Content {
   imageUrl       String?
   Course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   userProgresses UserProgress[]
+  videoUrl String?
 
   @@schema("public")
 }
@@ -706,6 +708,18 @@ model Suggestion {
   respondedAt DateTime?
   User        User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
   Company     Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@schema("public")
+}
+
+model Announcement {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title     String
+  content   String
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  companyId String?  @db.Uuid
+  Company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }
