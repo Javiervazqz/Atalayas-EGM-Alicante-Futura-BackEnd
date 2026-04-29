@@ -25,13 +25,15 @@ import { CompleteManualLessonDto } from './dto/complete-manual-lesson.dto.js';
 
 @ApiTags('Enrollment')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard) // 🔒 Protegemos todas las rutas
 @Controller('enrollment')
 export class EnrollmentController {
   constructor(private readonly enrollmentService: EnrollmentService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Matricular a un usuario en un curso (Solo Admins)' })
+  @ApiOperation({
+    summary: 'Matricular a un usuario en un curso (Solo Admins)',
+  })
   create(
     @Body() createEnrollmentDto: CreateEnrollmentDto,
     @Req() req: Request & { user: User },
@@ -48,7 +50,11 @@ export class EnrollmentController {
     @Body() dto: { userIds: string[]; courseId: string },
     @Req() req: Request & { user: User },
   ) {
-    return this.enrollmentService.bulkEnroll(dto.userIds, dto.courseId, req.user);
+    return this.enrollmentService.bulkEnroll(
+      dto.userIds,
+      dto.courseId,
+      req.user,
+    );
   }
 
   @Get()
@@ -57,12 +63,16 @@ export class EnrollmentController {
     return this.enrollmentService.findAll(req.user);
   }
 
+  // 🚀 RUTAS ESTÁTICAS PRIMERO 🚀
+  // Estas rutas deben evaluarse antes para que el ':id' no se las "trague"
+
   @Patch('video-progress')
   @ApiOperation({ summary: 'Actualizar el segundero de un vídeo' })
   async updateVideoProgress(
     @GetUser() user: User,
     @Body() updateDto: UpdateVideoProgressDto,
   ) {
+    // 3. Añadimos el await para que ESLint no se queje
     return await this.enrollmentService.updateVideoProgress(
       user.id,
       updateDto.contentId,
@@ -77,11 +87,14 @@ export class EnrollmentController {
     @GetUser() user: User,
     @Body() completeDto: CompleteManualLessonDto,
   ) {
+    // 4. Corregimos el nombre al que pusimos en el Service: completeManualLesson
     return await this.enrollmentService.completeManualLesson(
       user.id,
       completeDto.contentId,
     );
   }
+
+  // ⬇️ RUTAS DINÁMICAS (CON :id) DESPUÉS ⬇️
 
   @Get(':id')
   @ApiOperation({ summary: 'Ver detalle de una matriculación' })

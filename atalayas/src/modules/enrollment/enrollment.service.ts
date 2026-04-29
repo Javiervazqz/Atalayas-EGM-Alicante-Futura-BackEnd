@@ -237,7 +237,9 @@ export class EnrollmentService {
       throw new BadRequestException('Debes seleccionar al menos un usuario');
     }
 
-    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
     if (!course) throw new NotFoundException('Curso no encontrado');
 
     if (
@@ -251,8 +253,13 @@ export class EnrollmentService {
 
     for (const userId of userIds) {
       try {
-        const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        if (!user) { results.errors.push(`Usuario ${userId} no existe`); continue; }
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
+        if (!user) {
+          results.errors.push(`Usuario ${userId} no existe`);
+          continue;
+        }
 
         if (
           requestUser.role !== 'GENERAL_ADMIN' &&
@@ -265,7 +272,10 @@ export class EnrollmentService {
         const exists = await this.prisma.enrollment.findFirst({
           where: { userId, courseId },
         });
-        if (exists) { results.skipped++; continue; }
+        if (exists) {
+          results.skipped++;
+          continue;
+        }
 
         await this.prisma.enrollment.create({ data: { userId, courseId } });
         results.enrolled++;

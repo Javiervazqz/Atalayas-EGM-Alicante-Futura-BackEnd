@@ -1,138 +1,136 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import OpenAI from 'openai';
 import axios from 'axios';
-import { extractText } from 'unpdf'; // 🚀 ¡Librería moderna al rescate!
+import { extractText } from 'unpdf';
+
+type QuizQuestion = {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+};
+
+type PodcastResult = {
+  script: string;
+  audioBase64: string;
+};
 
 @Injectable()
 export class AiService {
-  // Le cambiamos el nombre a la variable para que no confunda
   private aiClient: OpenAI;
 
   constructor() {
     this.aiClient = new OpenAI({
       baseURL: 'https://api.groq.com/openai/v1',
-      apiKey: process.env.GROQ_API_KEY, // 👈 Usando la llave de tu compañero
+      apiKey: process.env.GROQ_API_KEY,
     });
   }
 
-  async generatePodcastFromPdf(
-    pdfBuffer: Buffer,
-  ): Promise<{ script: string; audioBase64: string }> {
+  async extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
+    const pdfBytes = new Uint8Array(pdfBuffer);
+    const pdfData = await extractText(pdfBytes, { mergePages: true });
+    return pdfData.text || '';
+  }
+
+  async generateSummary(text: string): Promise<string> {
+    const completion = await this.aiClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Eres un redactor experto en síntesis corporativa. Genera un resumen ejecutivo estructurado por puntos clave sin usar encabezados Markdown (#).',
+        },
+        { role: 'user', content: text },
+      ],
+    });
+    return completion.choices[0].message.content || '';
+  }
+
+  async generateQuizFromText(summaryText: string): Promise<QuizQuestion[]> {
     try {
-      console.log('📄 1/3 Extrayendo texto del PDF...');
+      const prompt = `
+        Eres un profesor experto. Genera un test de 4 preguntas de opción múltiple.
+        REGLA ESTRICTA: Responde ÚNICAMENTE con un Array JSON. 
+        No incluyas explicaciones.
+        Formato: [{"question": "...", "options": ["...", "..."], "correctAnswer": "..."}]
+        Texto: "${summaryText}"
+      `;
 
-      // 🛠️ unpdf usa estándares modernos, así que pasamos el Buffer a Uint8Array
-      const pdfBytes = new Uint8Array(pdfBuffer);
+      const response = await this.aiClient.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.2,
+        response_format: { type: 'json_object' }, // Groq soporta JSON mode
+      });
 
-      // Extraemos el texto y le pedimos que una todas las páginas en un solo string
-      const pdfData = await extractText(pdfBytes, { mergePages: true });
-      const rawText = pdfData.text; // Ya viene tipado como string
+      let content = response.choices[0].message.content || '[]';
 
-      if (!rawText || rawText.trim().length === 0) {
-        throw new Error('El PDF está vacío o no se pudo leer el texto.');
-      }
+      // Limpieza por si el modelo incluye Markdown
+      content = content
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
 
-      console.log('🧠 2/3 Generando guion con Groq...');
+      const parsed = JSON.parse(content);
+      // Si el modelo envuelve el array en un objeto { "questions": [...] }
+      return Array.isArray(parsed) ? parsed : parsed.questions || [];
+    } catch (error) {
+      console.error('🚨 Error generando el Quiz:', error);
+      return [];
+    }
+  }
+
+  async generatePodcast(text: string): Promise<PodcastResult> {
+    try {
+      // 1. Generar guion ameno
       const completion = await this.aiClient.chat.completions.create({
-        model: 'llama-3.3-70b-versatile', // 👈 Ponemos el modelo que usa tu ChatBot
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
             content:
-              'Eres un experto creador de contenido educativo. Voy a pasarte un texto aburrido. Tu objetivo es resumirlo y convertirlo en un monólogo de audio (estilo podcast) muy ameno, directo y fácil de entender. Usa un tono profesional pero cercano. No pongas acotaciones de sonido ni notas de autor, solo el texto exacto que debe leer el locutor. Máximo 2 párrafos.',
+              'Eres un locutor de podcast. Resume el texto de forma amena y directa. Máximo 2 párrafos. No incluyas acotaciones.',
           },
-          { role: 'user', content: rawText },
+          { role: 'user', content: text },
         ],
       });
 
-      const script =
-        completion.choices[0].message.content ||
-        'Error: La IA no generó texto.';
+      const rawScript = completion.choices[0].message.content || '';
+      const cleanScript = rawScript.replace(/\*\*|__|#+|\[.*?\]/g, '').trim();
 
-      console.log('🎙️ 3/3 Generando audio con ElevenLabs...');
-      const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
-
-      const voiceId = 'IKne3meq5aSn9XLyUdCD';
-
+      // 2. Generar audio con ElevenLabs (URL corregida)
       const audioResponse = await axios.post(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        `https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL`,
         {
-          text: script,
+          text: cleanScript,
           model_id: 'eleven_multilingual_v2',
+          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
         },
         {
           headers: {
-            'xi-api-key': elevenLabsApiKey,
+            'xi-api-key': process.env.ELEVENLABS_API_KEY,
             'Content-Type': 'application/json',
           },
           responseType: 'arraybuffer',
         },
       );
 
-      console.log('✅ ¡Podcast generado con éxito!');
-
-      const audioBase64 = Buffer.from(
-        audioResponse.data as ArrayBuffer,
-      ).toString('base64');
-
       return {
-        script: script,
-        audioBase64: audioBase64,
+        script: cleanScript,
+        audioBase64: Buffer.from(audioResponse.data as ArrayBuffer).toString(
+          'base64',
+        ),
       };
-    } catch (error) {
-      console.error('🚨 Error en el pipeline de IA:', error);
+    } catch (error: any) {
+      console.error('🚨 Error en Podcast Pipeline:', error);
+
+      if (axios.isAxiosError(error) && error.response?.status === 402) {
+        throw new InternalServerErrorException('Cuota de ElevenLabs agotada.');
+      }
+
       throw new InternalServerErrorException(
-        'Error al generar el contenido de IA',
+        'Error al generar contenido de audio.',
       );
-    }
-  }
-
-  // 🚀 NUEVO MÉTODO EN TU AI.SERVICE.TS
-  async generateQuizFromText(
-    summaryText: string,
-  ): Promise<Record<string, unknown>[]> {
-    try {
-      const prompt = `
-        Eres un profesor experto. Lee el siguiente texto y genera un test de 4 preguntas de opción múltiple para evaluar la comprensión del alumno.
-        
-        REGLA ESTRICTA: Debes responder ÚNICAMENTE con un Array en formato JSON válido. No incluyas texto antes ni después del JSON. No uses markdown (sin \`\`\`json).
-        
-        Formato exacto requerido:
-        [
-          {
-            "question": "¿Pregunta de ejemplo?",
-            "options": ["Respuesta incorrecta 1", "Respuesta correcta exacta", "Respuesta incorrecta 2", "Respuesta incorrecta 3"],
-            "correctAnswer": "Respuesta correcta exacta"
-          }
-        ]
-
-        IMPORTANTE: En 'correctAnswer' debes escribir el TEXTO EXACTO de la opción correcta, no pongas "Opción A" ni letras.
-
-        Texto de la lección:
-        "${summaryText}"
-      `;
-
-      const response = await this.aiClient.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'llama3-8b-8192',
-        temperature: 0.3,
-      });
-
-      let jsonString: string = response?.choices?.[0]?.message?.content || '[]';
-
-      // 🛡️ TRUCO PRO: Limpiamos los backticks de markdown por si Llama 3 se pone rebelde
-      jsonString = jsonString
-        .replace(/```json/gi, '')
-        .replace(/```/g, '')
-        .trim();
-
-      // Tipamos explícitamente el parseo para que ESLint se calme
-      const parsedData = JSON.parse(jsonString) as Record<string, unknown>[];
-
-      return parsedData;
-    } catch (error) {
-      console.error('🚨 Error generando el Quiz con IA:', error);
-      return []; // Devolvemos un array vacío en lugar de null para evitar errores de tipo
     }
   }
 }

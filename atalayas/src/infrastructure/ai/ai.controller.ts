@@ -46,7 +46,10 @@ export class AiController {
     @Request() req: any,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // Aquí podrías usar req.user.id si quisieras guardar quién generó el audio
-    return this.aiService.generatePodcastFromPdf(file.buffer);
+    // 1. Extraemos el texto del buffer del PDF usando el nuevo método del servicio
+    const rawText = await this.aiService.extractTextFromPdf(file.buffer);
+
+    // 2. Llamamos al método actualizado 'generatePodcast' pasando el texto
+    return this.aiService.generatePodcast(rawText);
   }
 }

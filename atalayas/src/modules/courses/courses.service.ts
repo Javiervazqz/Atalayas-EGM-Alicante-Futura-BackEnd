@@ -33,57 +33,111 @@ export class CoursesService {
       requestUser.role === 'GENERAL_ADMIN' && createCourseDto.companyId
         ? createCourseDto.companyId
         : requestUser.companyId;
-
-    if (!companyId)
+    if (!companyId) {
       throw new ForbiddenException('Se requiere ID de empresa válido');
+    }
 
+    // 🛡️ Regla de seguridad: Solo GENERAL_ADMIN puede hacer cursos públicos
     if (requestUser.role !== 'GENERAL_ADMIN' && createCourseDto.isPublic) {
       throw new ForbiddenException(
-        'Solo administradores generales crean cursos públicos',
+        'Solo administradores generales pueden crear cursos públicos',
       );
     }
 
     let fileUrl: string | null = null;
 
     if (file) {
-      const fileName = `curso_pdf_${Date.now()}.pdf`;
-      const pdfMock = {
-        buffer: file.buffer,
-        originalname: fileName,
-        mimetype: file.mimetype,
-      } as Express.Multer.File;
-
-      fileUrl = await this.storageService.uploadFile(pdfMock);
+      // Usamos directamente el 'file' que viene de Multer,
+      // storageService ya debería encargarse del resto.
+      fileUrl = await this.storageService.uploadFile(file);
     }
 
     return await this.prismaService.course.create({
+      // ... resto de tu lógica de creación
+
       data: {
         title: createCourseDto.title,
         companyId,
         isPublic: createCourseDto.isPublic || false,
         category: createCourseDto.category || 'BASICO',
-        fileUrl: fileUrl,
+        fileUrl,
       },
     });
   }
 
+  /**
+   * Actualiza los datos del curso y reemplaza el archivo en storage si se sube uno nuevo.
+   */
+  async update(
+    id: string,
+    updateCourseDto: UpdateCourseDto,
+    requestUser: User,
+    file?: Express.Multer.File,
+  ) {
+    const course = await this.findOne(id, requestUser);
+
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException('No tienes permisos para actualizar cursos');
+    }
+
+    let fileUrl = course.fileUrl;
+
+    if (file) {
+      if (course.fileUrl) {
+        try {
+          await this.storageService.deleteFile(course.fileUrl);
+        } catch (error) {
+          console.error('Error al borrar archivo viejo:', error);
+        }
+      }
+      fileUrl = await this.storageService.uploadFile(file);
+    }
+
+    return this.prismaService.course.update({
+      where: { id: course.id },
+      data: {
+        title: updateCourseDto.title,
+        isPublic: updateCourseDto.isPublic,
+        category: updateCourseDto.category,
+        fileUrl,
+      },
+    });
+  }
+
+  /**
+   * Obtiene todos los cursos según el rol del usuario (Filtro por empresa o públicos).
+   */
   async findAll(requestUser: User) {
     if (requestUser.role === 'GENERAL_ADMIN') {
-      return await this.prismaService.course.findMany();
+      return this.prismaService.course.findMany({
+        include: { Company: true },
+      });
     }
+
     if (requestUser.role === 'PUBLIC') {
-      return await this.prismaService.course.findMany({
+      return this.prismaService.course.findMany({
         where: { isPublic: true },
       });
     }
-    return await this.prismaService.course.findMany({
-      include: { Content: true },
+
+    return this.prismaService.course.findMany({
       where: {
         OR: [{ companyId: requestUser.companyId }, { isPublic: true }],
+      },
+      include: {
+        Content: true,
+        _count: {
+          select: {
+            Content: true,
+          },
+        },
       },
     });
   }
 
+  /**
+   * Obtiene un curso por ID con sus contenidos y progreso del usuario actual.
+   */
   async findOne(id: string, requestUser: User) {
     const course = await this.prismaService.course.findUnique({
       where: { id },
@@ -91,6 +145,11 @@ export class CoursesService {
         Company: true,
         Content: {
           orderBy: { order: 'asc' },
+          include: {
+            userProgresses: {
+              where: { userId: requestUser.id },
+            },
+          },
         },
       },
     });
@@ -99,6 +158,7 @@ export class CoursesService {
       throw new NotFoundException(`El curso con ID ${id} no existe`);
     }
 
+    // Validación de permisos de acceso
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
       course.companyId !== requestUser.companyId &&
@@ -132,6 +192,14 @@ export class CoursesService {
 
     if (requestUser.role === 'EMPLOYEE') {
       throw new ForbiddenException('No tienes permisos para eliminar cursos');
+    }
+
+    if (course.fileUrl) {
+      try {
+        await this.storageService.deleteFile(course.fileUrl);
+      } catch (error) {
+        console.error('Error al borrar archivo adjunto:', error);
+      }
     }
 
     return this.prismaService.course.delete({

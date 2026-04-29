@@ -17,6 +17,7 @@ import { AiModule } from './infrastructure/ai/ai.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
+import { SuggestionsModule } from './modules/suggestions/suggestions.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { AnnouncementModule } from './modules/announcement/announcement.module';
     OnboardingModule,
     StatsModule,
     AnnouncementModule,
+    SuggestionsModule,
   ],
   controllers: [],
   providers: [],
