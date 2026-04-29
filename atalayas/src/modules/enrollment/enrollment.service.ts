@@ -7,7 +7,10 @@ import {
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto.js';
 import { UpdateEnrollmentDto } from './dto/update-enrollment.dto.js';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
-import { User } from '@prisma/client';
+import { User, Company } from '@prisma/client';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class EnrollmentService {
@@ -26,6 +29,7 @@ export class EnrollmentService {
     // 2. Validar que el usuario objetivo existe y pertenece a la empresa (si es ADMIN)
     const targetUser = await this.prisma.user.findUnique({
       where: { id: userId },
+
     });
     if (!targetUser) throw new NotFoundException(`Usuario no encontrado.`);
 
@@ -70,51 +74,51 @@ export class EnrollmentService {
 
   async findAll(requestUser: User) {
     // GENERAL_ADMIN: Lo ve todo
-   /*  if (requestUser.role === 'GENERAL_ADMIN') {
-      return this.prisma.enrollment.findMany({
-        include: { User: true, Course: true },
-      });
-    }
-
-    // ADMIN: Ve las matriculaciones de los empleados de SU empresa
-    if (requestUser.role === 'ADMIN') {
-      return this.prisma.enrollment.findMany({
-        where: { User: { companyId: requestUser.companyId } }, // Magia de Prisma
-        include: { User: true, Course: true },
-      });
-    }
-    // EMPLOYEE: Solo ve SUS propias matriculaciones
-    return this.prisma.enrollment.findMany({
-      where: { userId: requestUser.id },
-      include: { User: true, Course: true },
-    });*/
+    /*  if (requestUser.role === 'GENERAL_ADMIN') {
+       return this.prisma.enrollment.findMany({
+         include: { User: true, Course: true },
+       });
+     }
+ 
+     // ADMIN: Ve las matriculaciones de los empleados de SU empresa
+     if (requestUser.role === 'ADMIN') {
+       return this.prisma.enrollment.findMany({
+         where: { User: { companyId: requestUser.companyId } }, // Magia de Prisma
+         include: { User: true, Course: true },
+       });
+     }
+     // EMPLOYEE: Solo ve SUS propias matriculaciones
+     return this.prisma.enrollment.findMany({
+       where: { userId: requestUser.id },
+       include: { User: true, Course: true },
+     });*/
 
     const courses = await this.prisma.course.findMany({
-    where: {
-      OR: [
-        { isPublic: true },
-        { companyId: requestUser.companyId },
-      ],
-    },
-    include: {
-      Enrollment: {
-        where: {
-          userId: requestUser.id,
+      where: {
+        OR: [
+          { isPublic: true },
+          { companyId: requestUser.companyId },
+        ],
+      },
+      include: {
+        Enrollment: {
+          where: {
+            userId: requestUser.id,
+          },
         },
       },
-    },
-  });
+    });
 
-  // 👇 Aplanamos los datos
-  return courses.map(course => {
-    const enrollment = course.Enrollment[0];
+    // 👇 Aplanamos los datos
+    return courses.map(course => {
+      const enrollment = course.Enrollment[0];
 
-    return {
-      ...course,
-      progress: enrollment ? enrollment.progress : 0,
-      isCompleted: enrollment ? enrollment.progress === 100 : false,
-    };
-  });
+      return {
+        ...course,
+        progress: enrollment ? enrollment.progress : 0,
+        isCompleted: enrollment ? enrollment.progress === 100 : false,
+      };
+    });
 
   }
 
@@ -282,36 +286,101 @@ export class EnrollmentService {
   }
 
   async markContentOnAccess(userId: string, contentId: string) {
-  const content = await this.prisma.content.findUnique({
-    where: { id: contentId },
-  });
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId },
+    });
 
-  if (!content) {
-    throw new NotFoundException('Contenido no encontrado');
+    if (!content) {
+      throw new NotFoundException('Contenido no encontrado');
+    }
+
+    const hasQuiz = content.quiz && content.quiz !== 'null';
+
+    // 👉 Si TIENE quiz → NO completar automáticamente
+    if (hasQuiz) {
+      return;
+    }
+
+    // 👉 Si NO tiene quiz → marcar como completado
+    await this.prisma.userProgress.upsert({
+      where: { userId_contentId: { userId, contentId } },
+      update: {
+        isCompleted: true,
+        completedAt: new Date(),
+      },
+      create: {
+        userId,
+        contentId,
+        isCompleted: true,
+        completedAt: new Date(),
+      },
+    });
+
+    return await this.syncEnrollmentProgress(userId, contentId);
   }
 
-  const hasQuiz = content.quiz && content.quiz !== 'null';
+  async generateCertificate(user: User, company: Company , course: any) {
+    const filePath = path.join(process.cwd(), 'src/assets/certificate-base.pdf');
 
-  // 👉 Si TIENE quiz → NO completar automáticamente
-  if (hasQuiz) {
-    return;
+    const existingPdfBytes = fs.readFileSync(filePath);
+    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+    const page = pdfDoc.getPages()[0];
+    const { width, height } = page.getSize();
+
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    const userName = user.name || 'Empleado';
+    const courseTitle = course.title || 'Curso';
+    
+
+    const companyName = company.name || 'tu empresa';
+    const date = new Date().toLocaleDateString();
+
+    // 🧠 CENTRAR TEXTO
+    const centerText = (text: string, size: number) => {
+      const textWidth = font.widthOfTextAtSize(text, size);
+      return (width - textWidth) / 2;
+    };
+
+    // 👤 NOMBRE
+    page.drawText(userName, {
+      x: centerText(userName, 28),
+      y: height / 2 + 52,
+      size: 28,
+      font,
+      color: rgb(0, 0, 0),
+    });
+
+    // 🏢 EMPRESA (NUEVO)
+    page.drawText(companyName, {
+      x: centerText(companyName, 14),
+      y: height / 2 - 2,
+      size: 14,
+      font,
+      color: rgb(0, 0, 0),
+    });
+
+    // 📘 CURSO
+    page.drawText(courseTitle, {
+      x: centerText(courseTitle, 20),
+      y: height / 2 - 59,
+      size: 20,
+      font,
+      color: rgb(0, 0, 0),
+    });
+
+    // 📅 FECHA
+    page.drawText(date, {
+      x: centerText(date, 14),
+      y: height / 2 - 120,
+      size: 14,
+      font: fontRegular,
+    });
+
+    const pdfBytes = await pdfDoc.save();
+
+    return pdfBytes;
   }
-
-  // 👉 Si NO tiene quiz → marcar como completado
-  await this.prisma.userProgress.upsert({
-    where: { userId_contentId: { userId, contentId } },
-    update: {
-      isCompleted: true,
-      completedAt: new Date(),
-    },
-    create: {
-      userId,
-      contentId,
-      isCompleted: true,
-      completedAt: new Date(),
-    },
-  });
-
-  return await this.syncEnrollmentProgress(userId, contentId);
-}
 }
