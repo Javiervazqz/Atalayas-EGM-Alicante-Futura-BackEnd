@@ -2,6 +2,8 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import OpenAI from 'openai';
 import axios from 'axios';
 import { extractText } from 'unpdf';
+import { Express } from 'express';
+
 
 type QuizQuestion = {
   question: string;
@@ -32,6 +34,7 @@ export class AiService {
   }
 
   async generateSummary(text: string): Promise<string> {
+    console.log('GROQ_API_KEY:', process.env.GROQ_API_KEY);
     const completion = await this.aiClient.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
@@ -133,4 +136,17 @@ export class AiService {
       );
     }
   }
+
+async generatePodcastFromPdf(
+  file: Express.Multer.File,
+): Promise<{ script: string; audioBuffer: Buffer }> {
+  // 1. Extraer texto del PDF
+  const text = await this.extractTextFromPdf(file.buffer);
+
+  // 2. Reutilizar lo que ya funciona
+  return this.generatePodcast(text);
+}
+  
+
+ 
 }

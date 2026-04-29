@@ -11,6 +11,8 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { User } from '@prisma/client';
 import { AiService } from '../../infrastructure/ai/ai.service.js';
 import { StorageService } from '../../infrastructure/storage/storage.service.js';
+import { BadRequestException } from '@nestjs/common';
+import { AiService } from '../../infrastructure/ai/ai.service.js';
 
 @Injectable()
 export class CoursesService {
@@ -18,7 +20,8 @@ export class CoursesService {
     private readonly prismaService: PrismaService,
     private readonly aiService: AiService,
     private readonly storageService: StorageService,
-  ) {}
+    private readonly aiService: AiService
+  ) { }
 
   async create(
     createCourseDto: CreateCourseDto,
@@ -158,7 +161,15 @@ export class CoursesService {
       throw new NotFoundException(`El curso con ID ${id} no existe`);
     }
 
-    // Validación de permisos de acceso
+    const contentWithProgress = course.Content.map(c => ({
+      ...c,
+      isCompleted:
+        c.userProgresses.length > 0
+          ? c.userProgresses[0].isCompleted
+          : false,
+    }));
+
+    // Validación de acceso por empresa
     if (
       requestUser.role !== 'GENERAL_ADMIN' &&
       course.companyId !== requestUser.companyId &&
@@ -167,7 +178,10 @@ export class CoursesService {
       throw new ForbiddenException('No tienes permisos para ver este curso');
     }
 
-    return course;
+    return {
+      ...course,
+      Content: contentWithProgress,
+    };
   }
 
   async remove(id: string, requestUser: User) {
