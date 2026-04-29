@@ -11,14 +11,11 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { User } from '@prisma/client';
 import { AiService } from '../../infrastructure/ai/ai.service.js';
 import { StorageService } from '../../infrastructure/storage/storage.service.js';
-import { BadRequestException } from '@nestjs/common';
-import { AiService } from '../../infrastructure/ai/ai.service.js';
 
 @Injectable()
 export class CoursesService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly aiService: AiService,
     private readonly storageService: StorageService,
     private readonly aiService: AiService
   ) { }
