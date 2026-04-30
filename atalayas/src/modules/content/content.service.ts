@@ -9,6 +9,7 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { User } from '@prisma/client';
 import { AiService } from '../../infrastructure/ai/ai.service';
 import { StorageService } from '../../infrastructure/storage/storage.service';
+import { generate } from 'rxjs';
 
 @Injectable()
 export class ContentService {
@@ -39,7 +40,9 @@ export class ContentService {
       generateSummary: false,
       generateQuiz: false,
       generatePodcast: false,
+      generateImage: false,
       generateVideo: false,
+      generateLab: false,
     };
 
     try {
@@ -59,6 +62,7 @@ export class ContentService {
     let videoUrl: string | null = null;
     let podcastData: any = null;
     let quizData: any = null;
+    let labData: any = null;
 
     // 3. Procesamiento principal
     if (file) {
@@ -69,7 +73,9 @@ export class ContentService {
         options.generateSummary ||
         options.generateQuiz ||
         options.generatePodcast ||
-        options.generateVideo // Añadido aquí también
+        options.generateImage ||
+        options.generateVideo ||
+        options.generateLab
       ) {
         const rawText = await this.aiService.extractTextFromPdf(file.buffer);
         const tasks: Promise<any>[] = [];
@@ -81,6 +87,9 @@ export class ContentService {
               .generateSummary(rawText)
               .then((res) => (summary = res)),
           );
+        }
+
+        if (options.generateImage) {
           tasks.push(
             this.aiService
               .generateImage(rawText)
@@ -134,6 +143,15 @@ export class ContentService {
           );
         }
 
+        if (options.generateLab) {
+          tasks.push(
+            this.aiService
+              .generatePracticeLab(rawText)
+              .then((res) => (labData = res))
+              .catch((err) => console.error('[AI-Lab] Error:', err.message)),
+          );
+        }
+
         // Esperamos a todas las IAs
         await Promise.all(tasks);
       }
@@ -154,9 +172,10 @@ export class ContentService {
         url: finalUrl,
         summary,
         imageUrl,
-        videoUrl, // Nuevo campo de Runway
+        videoUrl,
         quiz: quizData as any,
         podcast: podcastData as any,
+        practiceLab: labData as any,
         order: nextOrder,
       },
     });

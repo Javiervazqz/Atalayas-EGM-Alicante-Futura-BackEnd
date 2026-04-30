@@ -19,6 +19,23 @@ type QuizResult = {
   questions: QuizQuestion[];
 };
 
+type PracticeLab = {
+  scenarioTitle: string;
+  instruction: string;
+  backgroundImage: string; // Sugerencia de asset (ej: "industrial_barrel")
+  draggables: {
+    id: string;
+    content: string;
+    description: string;
+  }[];
+  dropZones: {
+    id: string;
+    expectedId: string; // El ID del draggable que debe ir aquí
+    label: string;
+    position: { x: number; y: number }; // Coordenadas relativas (%)
+  }[];
+};
+
 @Injectable()
 export class AiService {
   private aiClient: OpenAI;
@@ -329,6 +346,74 @@ export class AiService {
 
       // Retornamos el backup para que el campo videoUrl NO sea null y no rompa la base de datos
       return 'https://static.videezy.com/system/resources/previews/000/012/367/original/Pexels_Videos_3938.mp4';
+    }
+  }
+  async generatePracticeLab(text: string): Promise<PracticeLab> {
+    const completion = await this.aiClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `Actúa como un experto en diseño instruccional para formación de empleados.
+Tu objetivo es extraer el CONOCIMIENTO OPERATIVO del documento, no su estructura.
+
+REGLA DE ORO: Pregúntate "¿Qué debe HACER o RECORDAR el empleado el primer día?"
+Los draggables deben ser respuestas a esa pregunta, nunca títulos de sección.
+
+JERARQUÍA DE EXTRACCIÓN (en orden de prioridad):
+1. PROCEDIMIENTOS CRÍTICOS: pasos específicos, temperaturas, tiempos, proporciones
+   Ejemplos válidos: "Autoclave 120°C / 20 min", "Lejía 1:10 · esperar 30 min"
+2. UMBRALES Y LÍMITES: cifras que determinan qué hacer
+   Ejemplos válidos: "Volumen > 100 mL → residuo especial", "Máx. 80% capacidad envase"
+3. RESPONSABLES Y CONTACTOS: quién hace qué
+   Ejemplos válidos: "Empresa CONSENUR (residuos sanitarios)", "Director de grupo: etiquetado"
+4. PROHIBICIONES CLAVE: lo que NUNCA se debe hacer
+   Ejemplos válidos: "Nunca disolventes por fregadera", "No almacenar > 150 cm altura"
+
+Las dropZones deben ser los 3-4 PROCESOS PRINCIPALES del documento
+(no subcategorías, sino fases o áreas de responsabilidad operativa).
+
+REGLAS DE CALIDAD:
+- Cada draggable debe ser autoexplicativo en ≤6 palabras
+- Prioriza datos cuantitativos y verbos de acción
+- Si el PDF tiene listas de procedimientos, cada paso es un draggable candidato
+- Genera entre 8 y 10 draggables y 3-4 dropZones
+
+FORMATO JSON ESTRICTO:
+{
+  "scenarioTitle": "Título técnico ≤40 caracteres",
+  "instruction": "Instrucción de acción para el empleado",
+  "draggables": [{"id": "proc_1", "nombre": "Autoclave 120°C / 20 min"}],
+  "dropZones": [{"id": "bio_solido", "nombre": "Residuos Biológicos Sólidos"}],
+  "validation": {"proc_1": "bio_solido"}
+}
+
+PROHIBIDO: IDs con la palabra "residuo", "zona", "item" o números solos.
+PROHIBIDO: draggables que sean nombres de secciones o categorías genéricas.`,
+        },
+        {
+          role: 'user',
+          content: `Crea un laboratorio de práctica basado en este contenido: ${text.substring(0, 3000)}`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
+    });
+
+    const content = completion.choices[0].message.content || '{}';
+
+    try {
+      return JSON.parse(content) as PracticeLab;
+    } catch (e) {
+      console.error('Error parseando Lab Practice:', e);
+      // Retorno de seguridad por si falla
+      return {
+        scenarioTitle: 'Práctica de seguridad',
+        instruction: 'Arrastra los elementos a su lugar correcto',
+        backgroundImage: 'generic_workplace',
+        draggables: [],
+        dropZones: [],
+      };
     }
   }
 }

@@ -84,4 +84,35 @@ export class AiController {
       url: imageUrl,
     };
   }
+  @Post('generate-lab-config')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Genera el JSON de configuración para el simulador Canvas a partir de un PDF',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async generateLab(@UploadedFile() file: Express.Multer.File) {
+    // 1. Extraer texto
+    const rawText = await this.aiService.extractTextFromPdf(file.buffer);
+
+    // 2. Generar la lógica del laboratorio
+    const labConfig = await this.aiService.generatePracticeLab(rawText);
+
+    return {
+      message: 'Configuración de laboratorio generada con éxito',
+      data: labConfig,
+    };
+  }
 }
