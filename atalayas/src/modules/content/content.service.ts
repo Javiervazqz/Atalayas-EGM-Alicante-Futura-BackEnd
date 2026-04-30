@@ -9,7 +9,7 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { User } from '@prisma/client';
 import { AiService } from '../../infrastructure/ai/ai.service';
 import { StorageService } from '../../infrastructure/storage/storage.service';
-import { EnrollmentService } from '../enrollment/enrollment.service';
+import { generate } from 'rxjs';
 
 @Injectable()
 export class ContentService {
@@ -26,9 +26,7 @@ export class ContentService {
     courseId: string,
     file?: Express.Multer.File,
   ) {
-    console.log('courseId:', courseId);
-    console.log('requestUser:', requestUser);
-    console.log('createContentDto:', createContentDto);
+    // 1. Seguridad y validación de curso
     if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
@@ -38,28 +36,19 @@ export class ContentService {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
 
-    const courseExists = await this.prisma.course.findUnique({
+    const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
+    if (!course) throw new NotFoundException('El curso no existe');
 
-    if (!courseExists) {
-      throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
-    }
-
-    if (
-      requestUser.role === 'ADMIN' &&
-      courseExists.companyId !== requestUser.companyId
-    ) {
-      throw new ForbiddenException(
-        `No tienes permisos para agregar contenido a este curso.`,
-      );
-    }
-
-    // 2. Parsear opciones de IA
+    // 2. Parsear opciones de IA (Summary, Quiz, Podcast, Video)
     let options = {
       generateSummary: false,
       generateQuiz: false,
       generatePodcast: false,
+      generateImage: false,
+      generateVideo: false,
+      generateLab: false,
     };
 
     try {
@@ -70,28 +59,34 @@ export class ContentService {
             : createContentDto.options;
       }
     } catch (e) {
-      console.error('Error parsing options JSON', e);
+      console.error('Error parsing options', e);
     }
 
     let finalUrl = createContentDto.url;
     let summary = '';
-    let podcastData: { url: string; script: string } | null = null;
+    let imageUrl: string | null = null;
+    let videoUrl: string | null = null;
+    let podcastData: any = null;
     let quizData: any = null;
+    let labData: any = null;
 
-    // 3. Procesamiento de archivo y IA
+    // 3. Procesamiento principal
     if (file) {
       finalUrl = await this.storageService.uploadFile(file);
 
+      // Verificamos si hay alguna opción de IA activa
       if (
         options.generateSummary ||
         options.generateQuiz ||
-        options.generatePodcast
+        options.generatePodcast ||
+        options.generateImage ||
+        options.generateVideo ||
+        options.generateLab
       ) {
         const rawText = await this.aiService.extractTextFromPdf(file.buffer);
-
-        // Ejecutamos en paralelo para ganar velocidad
         const tasks: Promise<any>[] = [];
 
+        // Tarea: RESUMEN e IMAGEN (Agrupadas)
         if (options.generateSummary) {
           tasks.push(
             this.aiService
@@ -100,6 +95,36 @@ export class ContentService {
           );
         }
 
+        if (options.generateImage) {
+          tasks.push(
+            this.aiService
+              .generateImage(rawText)
+              .then((res) => (imageUrl = res)),
+          );
+        }
+
+        // Tarea: VÍDEO (Ahora es independiente del resumen)
+        if (options.generateVideo) {
+          console.log('[AI-Video] Iniciando proceso de búsqueda en Pexels...');
+          tasks.push(
+            this.aiService
+              .generateVideo(rawText)
+              .then((res) => {
+                if (res) {
+                  console.log('[AI-Video] URL recibida con éxito:', res);
+                  videoUrl = res;
+                }
+              })
+              .catch((err) => {
+                console.error(
+                  '[AI-Video] Error en tarea de vídeo:',
+                  err.message,
+                );
+              }),
+          );
+        }
+
+        // Tarea: QUIZ
         if (options.generateQuiz) {
           tasks.push(
             this.aiService
@@ -108,46 +133,58 @@ export class ContentService {
           );
         }
 
+        // Tarea: PODCAST
         if (options.generatePodcast) {
           tasks.push(
             (async () => {
               const { script, audioBuffer } =
                 await this.aiService.generatePodcast(rawText);
-              const audioFileMock = {
-                buffer: audioBuffer,
-                originalname: `podcast_${Date.now()}.mp3`,
-                mimetype: 'audio/mpeg',
-              } as Express.Multer.File;
-              const audioUrl =
-                await this.storageService.uploadFile(audioFileMock);
-              podcastData = { url: audioUrl, script: script };
+              const audioUrl = await this.storageService.uploadBuffer(
+                audioBuffer,
+                `podcast-${Date.now()}.mp3`,
+                'audio/mpeg',
+              );
+              podcastData = { url: audioUrl, script };
             })(),
           );
         }
 
+        if (options.generateLab) {
+          tasks.push(
+            this.aiService
+              .generatePracticeLab(rawText)
+              .then((res) => (labData = res))
+              .catch((err) => console.error('[AI-Lab] Error:', err.message)),
+          );
+        }
+
+        // Esperamos a todas las IAs
         await Promise.all(tasks);
       }
     }
 
-    // 4. Lógica de orden
+    // 4. Calcular orden correlativo
     const lastContent = await this.prisma.content.findFirst({
-      where: { courseId: courseId },
+      where: { courseId },
       orderBy: { order: 'desc' },
     });
     const nextOrder = lastContent ? lastContent.order + 1 : 1;
 
-    // 5. Guardado Final
-    const dataToSave = {
-      title: createContentDto.title,
-      courseId: courseId,
-      url: finalUrl ?? undefined,
-      summary: summary,
-      quiz: quizData ?? undefined,
-      podcast: podcastData ?? undefined,
-      order: nextOrder,
-    };
-
-    return this.prisma.content.create({ data: dataToSave });
+    // 5. Persistencia en Base de Datos
+    return this.prisma.content.create({
+      data: {
+        title: createContentDto.title,
+        courseId,
+        url: finalUrl,
+        summary,
+        imageUrl,
+        videoUrl,
+        quiz: quizData as any,
+        podcast: podcastData as any,
+        practiceLab: labData as any,
+        order: nextOrder,
+      },
+    });
   }
 
   async findAll(requestUser: User, courseId: string) {
@@ -173,16 +210,10 @@ export class ContentService {
   }
 
   async findOne(id: string, requestUser: User) {
-
-      await this.ensureUserProgress(requestUser.id, id);
-
-    // Eliminamos los console.log de depuración para producción
     const content = await this.prisma.content.findUnique({
       where: { id },
       include: {
         Course: true,
-        // 🚀 AQUÍ ESTÁ EL CAMBIO: Traemos el progreso solo de este usuario
-        // 1. Incluimos el progreso del usuario que hace la petición
         userProgresses: {
           where: {
             userId: requestUser.id,
@@ -192,19 +223,15 @@ export class ContentService {
     });
 
     if (!content) throw new NotFoundException(`Contenido no encontrado en DB`);
-
-    // Si es un administrador global, devolvemos todo directamente
     if (requestUser.role === 'GENERAL_ADMIN') return content;
 
     const courseData = content.Course;
-
     if (!courseData) {
       throw new Error(
         'Error interno: No se pudo cargar la relación del curso.',
       );
     }
 
-    // Validación de seguridad por compañía
     if (
       courseData.companyId !== requestUser.companyId &&
       !courseData.isPublic
@@ -214,15 +241,12 @@ export class ContentService {
       );
     }
 
-    // 2. Aplanamos la respuesta para que el frontend reciba "isCompleted" directamente
-    // En lugar de UserProgress: [{ isCompleted: true }]
     const { userProgresses, ...rest } = content;
 
     return {
       ...rest,
       isCompleted:
         userProgresses.length > 0 ? userProgresses[0].isCompleted : false,
-      // Opcional: puedes devolver también la fecha si la necesitas
       completedAt:
         userProgresses.length > 0 ? userProgresses[0].completedAt : null,
     };
@@ -274,6 +298,7 @@ export class ContentService {
 
     return this.prisma.content.delete({ where: { id } });
   }
+
   async completeQuiz(
     contentId: string,
     requestUser: User,
