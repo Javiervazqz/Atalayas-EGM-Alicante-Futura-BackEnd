@@ -14,6 +14,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiTags,
@@ -22,13 +23,16 @@ import {
 import { Request } from 'express';
 import { User } from '@prisma/client';
 
+// 🚀 RUTAS INTERNAS DEL MÓDULO DE CURSOS
 import { CoursesService } from './courses.service.js';
 import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
 
+// 🚀 RUTAS HACIA LA NUEVA CARPETA COMMON (Salimos de courses -> modules -> y entramos a common)
 import { AuthGuard } from '../../common/guards/auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { GenerateAiContentDto } from './dto/generate-ai.dto.js';
 
 @ApiTags('Courses')
 @ApiBearerAuth()
@@ -89,5 +93,33 @@ export class CoursesController {
   @ApiOperation({ summary: 'Eliminar un curso y su imagen asociada' })
   async remove(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return await this.coursesService.remove(id, req.user);
+  }
+
+  @Post(':id/content/ai')
+  @Roles('ADMIN', 'GENERAL_ADMIN')
+  @ApiOperation({
+    summary: 'Generar contenido educativo automáticamente con IA',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: GenerateAiContentDto })
+  @UseInterceptors(FileInterceptor('file'))
+  async generateAiContent(
+    @Param('id') courseId: string,
+    @Body('title') title: string,
+    @Body('order') order: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request & { user: User },
+  ) {
+    console.log(
+      `🚀 ¡Petición recibida en el controlador! Título: ${title}, Orden: ${order}`,
+    );
+
+    return await this.coursesService.generateContentWithAi(
+      courseId,
+      title,
+      Number(order),
+      file,
+      req.user,
+    );
   }
 }

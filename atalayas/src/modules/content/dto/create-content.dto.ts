@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsUrl,
+  IsInt,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateContentDto {
   @ApiProperty({
@@ -26,10 +34,13 @@ export class CreateContentDto {
   @IsString()
   url?: string;
 
-  @ApiPropertyOptional({ example: 'URL de una imagen de portada' })
+  @ApiProperty({ example: 'URL del servicio', required: false })
   @IsString()
   @IsOptional()
   imageUrl?: string;
+  @ApiPropertyOptional({ example: 'URL de una imagen de portada' })
+  @IsString()
+  @IsOptional()
 
   // 🚀 ESTE CAMPO ES PARA QUE SWAGGER MUESTRE EL BOTÓN DE SUBIR ARCHIVO
   @ApiProperty({ type: 'string', format: 'binary', required: false })

@@ -41,7 +41,10 @@ export class CreateUserDto {
   @IsOptional()
   role?: Role;
 
-  @ApiProperty({ example: 'Almacén', description: 'Puesto específico de trabajo' })
+  @ApiProperty({
+    example: 'Almacén',
+    description: 'Puesto específico de trabajo',
+  })
   @IsString()
   @IsNotEmpty({ message: 'El puesto de trabajo (jobRole) es obligatorio' })
   jobRole!: string;

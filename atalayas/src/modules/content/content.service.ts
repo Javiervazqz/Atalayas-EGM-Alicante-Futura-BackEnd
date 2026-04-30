@@ -17,7 +17,8 @@ export class ContentService {
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly storageService: StorageService,
-  ) {}
+    private readonly enrollmentService: EnrollmentService
+  ) { }
 
   async create(
     createContentDto: CreateContentDto,
@@ -27,6 +28,11 @@ export class ContentService {
   ) {
     // 1. Seguridad y validación de curso
     if (requestUser.role === 'EMPLOYEE' || requestUser.role === 'PUBLIC') {
+      throw new ForbiddenException('No tienes permisos para crear contenido');
+    }
+    // 1. Validaciones de permisos
+    const rolesProhibidos = ['EMPLOYEE', 'PUBLIC'];
+    if (rolesProhibidos.includes(requestUser.role)) {
       throw new ForbiddenException('No tienes permisos para crear contenido');
     }
 
@@ -122,7 +128,7 @@ export class ContentService {
         if (options.generateQuiz) {
           tasks.push(
             this.aiService
-              .generateQuiz(rawText)
+              .generateQuizFromText(rawText)
               .then((res) => (quizData = res)),
           );
         }
@@ -185,6 +191,9 @@ export class ContentService {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
+    if (!course) {
+      throw new NotFoundException(`El curso con ID ${courseId} no existe.`);
+    }
     if (!course) throw new NotFoundException(`Curso no encontrado`);
 
     if (
@@ -193,10 +202,10 @@ export class ContentService {
     ) {
       throw new ForbiddenException(`No tienes acceso al curso.`);
     }
-
     return this.prisma.content.findMany({
       where: { courseId },
       orderBy: { order: 'asc' },
+      include: { Course: true }, // Traemos la información del curso al que pertenece cada contenido
     });
   }
 
@@ -249,8 +258,19 @@ export class ContentService {
     requestUser: User,
   ) {
     const content = await this.findOne(id, requestUser);
-    if (requestUser.role === 'EMPLOYEE')
-      throw new ForbiddenException('Sin permisos');
+    if (requestUser.role === 'EMPLOYEE') {
+      throw new ForbiddenException(
+        'No tienes permisos para actualizar contenido',
+      );
+    }
+    if (
+      requestUser.role === 'ADMIN' &&
+      content.Course.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para actualizar contenido de este curso',
+      );
+    }
 
     return this.prisma.content.update({
       where: { id },
@@ -260,8 +280,21 @@ export class ContentService {
 
   async remove(id: string, requestUser: User) {
     const content = await this.findOne(id, requestUser);
-    if (requestUser.role === 'EMPLOYEE')
-      throw new ForbiddenException('Sin permisos');
+    const role = requestUser.role as string;
+
+    if (role === 'EMPLOYEE') {
+      throw new ForbiddenException(
+        'No tienes permisos para eliminar contenido',
+      );
+    }
+    if (
+      role === 'ADMIN' &&
+      content.Course.companyId !== requestUser.companyId
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para eliminar contenido de este curso',
+      );
+    }
 
     return this.prisma.content.delete({ where: { id } });
   }
@@ -281,7 +314,9 @@ export class ContentService {
 
     const isPerfectScore = data.score === data.totalQuestions;
 
-    return this.prisma.userProgress.upsert({
+    await this.ensureUserProgress(requestUser.id, contentId);
+
+    const progress = await this.prisma.userProgress.upsert({
       where: {
         userId_contentId: {
           userId: requestUser.id,
@@ -298,5 +333,32 @@ export class ContentService {
         isCompleted: isPerfectScore,
       },
     });
+
+    if (isPerfectScore) {
+      await this.enrollmentService.completeManualLesson(
+        requestUser.id,
+        contentId
+      );
+    }
+
+    return progress;
+  }
+  private async ensureUserProgress(userId: string, contentId: string) {
+    const exists = await this.prisma.userProgress.findUnique({
+      where: {
+        userId_contentId: { userId, contentId },
+      },
+    });
+
+    if (!exists) {
+      await this.prisma.userProgress.create({
+        data: {
+          userId,
+          contentId,
+          isCompleted: false,
+          lastTime: 0,
+        },
+      });
+    }
   }
 }

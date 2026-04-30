@@ -4,10 +4,6 @@ import axios from 'axios';
 import { extractText } from 'unpdf';
 import { StorageService } from '../storage/storage.service';
 
-type PodcastResult = {
-  script: string;
-  audioBuffer: Buffer;
-};
 
 type QuizQuestion = {
   question: string;
@@ -15,8 +11,9 @@ type QuizQuestion = {
   correctAnswer: string;
 };
 
-type QuizResult = {
-  questions: QuizQuestion[];
+type PodcastResult = {
+  script: string;
+  audioBuffer: Buffer;
 };
 
 type PracticeLab = {
@@ -54,92 +51,77 @@ export class AiService {
   }
 
   async generateSummary(text: string): Promise<string> {
+    console.log('GROQ_API_KEY:', process.env.GROQ_API_KEY);
     const completion = await this.aiClient.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
         {
           role: 'system',
           content:
-            'Eres un redactor experto en síntesis de información corporativa. Tu objetivo es transformar el contenido del documento en un resumen ejecutivo estructurado por puntos clave. Si hay imágenes, interpretalas segun el contexto y proporciona información relevante que no se vea en el texto del documento. No empieces por Introducción a Atalayas.\n' +
-            'NORMAS DE REDACCIÓN:\n' +
-            '- **Síntesis profesional**: Extrae la información esencial y preséntala de forma directa y seria.\n' +
-            '- **Limpieza de caracteres**: No incluyas ":" al inicio de las frases ni repliques errores de maquetación del original.\n' +
-            '- **Unificación de ideas**: Combina frases fragmentadas en oraciones completas y coherentes.\n' +
-            'REGLAS DE FORMATO:\n' +
-            '- Usa **MAYÚSCULAS EN NEGRITA** para los títulos de cada sección.\n' +
-            '- Usa listas con guiones (-) para desglosar los puntos clave.\n' +
-            '- Máximo 3-4 puntos por sección para garantizar una lectura ágil.\n' +
-            '- No uses negritas dentro de las listas, mantén el texto limpio.\n' +
-            '- No utilices encabezados de Markdown (#).',
+            'Eres un redactor experto en síntesis corporativa. Genera un resumen ejecutivo estructurado por puntos clave sin usar encabezados Markdown (#).',
         },
         { role: 'user', content: text },
       ],
     });
-
     return completion.choices[0].message.content || '';
   }
 
-  async generateQuiz(text: string): Promise<QuizResult> {
-    const completion = await this.aiClient.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Eres un generador de cuestionarios educativos. Tu tarea es devolver exclusivamente un objeto JSON. ' +
-            'No incluyas texto explicativo, solo el JSON puro. ' +
-            'ESTRUCTURA DEL JSON: {"questions": [{"question": "texto", "options": ["op1", "op2", "op3", "op4"], "correctAnswer": "op1"}]} ' +
-            'Asegúrate de que la correctAnswer coincida exactamente con una de las opciones.',
-        },
-        {
-          role: 'user',
-          content: `Genera un cuestionario de 4 preguntas basado en el siguiente texto: ${text}`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.2, // Bajamos la temperatura para mayor precisión en el formato
-    });
-
-    const content = completion.choices[0].message.content || '{}';
-
+  async generateQuizFromText(summaryText: string): Promise<QuizQuestion[]> {
     try {
-      const parsed = JSON.parse(content);
+      const prompt = `
+        Eres un profesor experto. Genera un test de 4 preguntas de opción múltiple.
+        REGLA ESTRICTA: Responde ÚNICAMENTE con un Array JSON. 
+        No incluyas explicaciones.
+        Formato: [{"question": "...", "options": ["...", "..."], "correctAnswer": "..."}]
+        Texto: "${summaryText}"
+      `;
 
-      // Validación de seguridad adicional
-      if (parsed.questions && Array.isArray(parsed.questions)) {
-        return parsed as QuizResult;
-      }
-    } catch (e) {
-      console.error('Error parseando el JSON de Groq:', e);
+      const response = await this.aiClient.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.2,
+        response_format: { type: 'json_object' }, // Groq soporta JSON mode
+      });
+
+      let content = response.choices[0].message.content || '[]';
+
+      // Limpieza por si el modelo incluye Markdown
+      content = content
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+
+      const parsed = JSON.parse(content) as
+        | { questions?: QuizQuestion[] }
+        | QuizQuestion[];
+      // Si el modelo envuelve el array en un objeto { "questions": [...] }
+      return Array.isArray(parsed) ? parsed : parsed.questions || [];
+    } catch (error) {
+      console.error('🚨 Error generando el Quiz:', error);
+      return [];
     }
-
-    return { questions: [] };
   }
 
   async generatePodcast(text: string): Promise<PodcastResult> {
     try {
-      // 1. Generar el guion con Groq
+      // 1. Generar guion ameno
       const completion = await this.aiClient.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
             content:
-              'Eres un locutor formativo. Genera un guion claro y natural de 150-200 palabras.',
+              'Eres un locutor de podcast. Resume el texto de forma amena y directa. Máximo 2 párrafos. No incluyas acotaciones.',
           },
           { role: 'user', content: text },
         ],
       });
 
       const rawScript = completion.choices[0].message.content || '';
+      const cleanScript = rawScript.replace(/\*\*|__|#+|\[.*?\]/g, '').trim();
 
-      const cleanScript = rawScript
-        .replace(/\*\*|__/g, '')
-        .replace(/#+/g, '')
-        .replace(/\[.*?\]/g, '')
-        .trim();
-
-      const audioResponse = await axios.post<ArrayBuffer>(
+      // 2. Generar audio con ElevenLabs (URL corregida)
+      const audioResponse = await axios.post(
         `https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL`,
         {
           text: cleanScript,
@@ -157,18 +139,18 @@ export class AiService {
 
       return {
         script: cleanScript,
-        audioBuffer: Buffer.from(audioResponse.data),
+        audioBuffer: Buffer.from(audioResponse.data as ArrayBuffer),
       };
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 402) {
-          throw new InternalServerErrorException(
-            'Cuota de ElevenLabs agotada.',
-          );
-        }
+    } catch (error: any) {
+      console.error('🚨 Error en Podcast Pipeline:', error);
+
+      if (axios.isAxiosError(error) && error.response?.status === 402) {
+        throw new InternalServerErrorException('Cuota de ElevenLabs agotada.');
       }
 
-      throw new InternalServerErrorException('Error generando podcast');
+      throw new InternalServerErrorException(
+        'Error al generar contenido de audio.',
+      );
     }
   }
 

@@ -15,6 +15,8 @@ import { CompanyRequestModule } from './modules/company-request/company-request.
 import { ChatBotModule } from './infrastructure/ai/chatbot/chatbot.module';
 import { AiModule } from './infrastructure/ai/ai.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { StatsModule } from './modules/stats/stats.module';
+import { AnnouncementModule } from './modules/announcement/announcement.module';
 import { SuggestionsModule } from './modules/suggestions/suggestions.module';
 
 @Module({
@@ -47,6 +49,8 @@ import { SuggestionsModule } from './modules/suggestions/suggestions.module';
     CompanyRequestModule,
     ChatBotModule,
     OnboardingModule,
+    StatsModule,
+    AnnouncementModule,
     SuggestionsModule,
   ],
   controllers: [],
